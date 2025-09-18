@@ -1,0 +1,11 @@
+CREATE TABLE session_tasks (
+  session_id TEXT NOT NULL PRIMARY KEY REFERENCES patient_sessions(id) ON DELETE CASCADE,
+  descripcion TEXT
+);
+
+upsertSessionTasks:
+INSERT OR REPLACE INTO session_tasks(session_id, descripcion)
+VALUES (?, ?);
+
+selectSessionTasks:
+SELECT * FROM session_tasks WHERE session_id = ?;

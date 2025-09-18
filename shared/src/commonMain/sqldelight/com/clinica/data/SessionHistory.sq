@@ -1,0 +1,16 @@
+CREATE TABLE session_history (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL REFERENCES patient_sessions(id) ON DELETE CASCADE,
+  change_type TEXT NOT NULL,
+  changed_at TEXT NOT NULL,
+  payload TEXT
+);
+
+CREATE INDEX session_history_idx ON session_history(session_id, changed_at DESC);
+
+insertHistoryEntry:
+INSERT INTO session_history(session_id, change_type, changed_at, payload)
+VALUES (?, ?, ?, ?);
+
+selectHistoryBySession:
+SELECT * FROM session_history WHERE session_id = ? ORDER BY changed_at DESC;

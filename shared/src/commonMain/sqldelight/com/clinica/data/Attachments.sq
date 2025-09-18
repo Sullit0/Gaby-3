@@ -1,0 +1,23 @@
+CREATE TABLE attachments (
+  id TEXT NOT NULL PRIMARY KEY,
+  session_id TEXT NOT NULL REFERENCES patient_sessions(id) ON DELETE CASCADE,
+  display_name TEXT NOT NULL,
+  stored_name TEXT NOT NULL,
+  mime_type TEXT,
+  size_bytes INTEGER,
+  sha256 TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX attachments_session_idx ON attachments(session_id);
+CREATE INDEX attachments_hash_idx ON attachments(sha256);
+
+insertAttachment:
+INSERT OR REPLACE INTO attachments(id, session_id, display_name, stored_name, mime_type, size_bytes, sha256, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+selectAttachmentsBySession:
+SELECT * FROM attachments WHERE session_id = ? ORDER BY created_at DESC;
+
+deleteAttachment:
+DELETE FROM attachments WHERE id = ?;

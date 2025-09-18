@@ -1,0 +1,19 @@
+CREATE TABLE session_treatment_objectives (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL REFERENCES patient_sessions(id) ON DELETE CASCADE,
+  stage TEXT NOT NULL,
+  field TEXT NOT NULL,
+  value TEXT
+);
+
+CREATE INDEX treatment_stage_idx ON session_treatment_objectives(session_id, stage);
+
+selectTreatmentObjectives:
+SELECT * FROM session_treatment_objectives WHERE session_id = ? ORDER BY id;
+
+insertTreatmentObjective:
+INSERT INTO session_treatment_objectives(session_id, stage, field, value)
+VALUES (?, ?, ?, ?);
+
+deleteTreatmentObjectivesBySession:
+DELETE FROM session_treatment_objectives WHERE session_id = ?;

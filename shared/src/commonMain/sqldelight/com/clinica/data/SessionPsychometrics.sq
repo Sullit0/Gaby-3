@@ -1,0 +1,18 @@
+CREATE TABLE session_psychometrics (
+  session_id TEXT NOT NULL PRIMARY KEY REFERENCES patient_sessions(id) ON DELETE CASCADE,
+  coeficiente_valor TEXT,
+  coeficiente_clasificacion TEXT,
+  temperamento TEXT,
+  personalidad TEXT,
+  atencion TEXT,
+  problemas_conducta TEXT,
+  dinamica_familiar TEXT,
+  otros_interes TEXT
+);
+
+upsertPsychometrics:
+INSERT OR REPLACE INTO session_psychometrics(session_id, coeficiente_valor, coeficiente_clasificacion, temperamento, personalidad, atencion, problemas_conducta, dinamica_familiar, otros_interes)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectPsychometrics:
+SELECT * FROM session_psychometrics WHERE session_id = ?;

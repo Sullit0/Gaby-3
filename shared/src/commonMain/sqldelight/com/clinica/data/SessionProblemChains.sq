@@ -1,0 +1,22 @@
+CREATE TABLE session_problem_chains (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL REFERENCES patient_sessions(id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
+  vulnerabilidades TEXT,
+  evento_desencadenante TEXT,
+  eslabones TEXT,
+  problemas_conducta TEXT,
+  consecuentes TEXT
+);
+
+CREATE INDEX problem_chains_session_idx ON session_problem_chains(session_id);
+
+selectProblemChainsBySession:
+SELECT * FROM session_problem_chains WHERE session_id = ? ORDER BY id;
+
+insertProblemChain:
+INSERT INTO session_problem_chains(session_id, label, vulnerabilidades, evento_desencadenante, eslabones, problemas_conducta, consecuentes)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+deleteProblemChainsBySession:
+DELETE FROM session_problem_chains WHERE session_id = ?;

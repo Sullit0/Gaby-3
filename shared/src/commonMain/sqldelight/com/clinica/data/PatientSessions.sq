@@ -1,0 +1,35 @@
+CREATE TABLE patient_sessions (
+  id TEXT NOT NULL PRIMARY KEY,
+  patient_id TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  session_code INTEGER NOT NULL,
+  session_date TEXT,
+  first_attention_date TEXT,
+  motivo_principal TEXT,
+  otros_motivos TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX sessions_patient_code_idx ON patient_sessions(patient_id, session_code);
+CREATE INDEX sessions_date_idx ON patient_sessions(session_date);
+
+insertSession:
+INSERT INTO patient_sessions(id, patient_id, session_code, session_date, first_attention_date, motivo_principal, otros_motivos, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateSession:
+UPDATE patient_sessions
+SET session_code = ?, session_date = ?, first_attention_date = ?, motivo_principal = ?, otros_motivos = ?, updated_at = ?
+WHERE id = ?;
+
+selectSessionById:
+SELECT * FROM patient_sessions WHERE id = ?;
+
+selectSessionsByPatient:
+SELECT * FROM patient_sessions WHERE patient_id = ? ORDER BY session_code;
+
+deleteSession:
+DELETE FROM patient_sessions WHERE id = ?;
+
+selectMaxSessionCode:
+SELECT COALESCE(MAX(session_code), 0) FROM patient_sessions WHERE patient_id = ?;

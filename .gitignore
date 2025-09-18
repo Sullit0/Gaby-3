@@ -1,0 +1,15 @@
+# Gradle
+.gradle/
+.gradle-user-home/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+
+# Local runtime artifacts
+*.log

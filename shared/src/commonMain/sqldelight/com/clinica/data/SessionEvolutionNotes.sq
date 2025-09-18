@@ -1,0 +1,20 @@
+CREATE TABLE session_evolution_notes (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL REFERENCES patient_sessions(id) ON DELETE CASCADE,
+  titulo TEXT NOT NULL,
+  nota_fecha TEXT,
+  comportamiento_trabajado TEXT,
+  apuntes TEXT
+);
+
+CREATE INDEX evolution_notes_session_idx ON session_evolution_notes(session_id);
+
+selectEvolutionNotesBySession:
+SELECT * FROM session_evolution_notes WHERE session_id = ? ORDER BY id;
+
+insertEvolutionNote:
+INSERT INTO session_evolution_notes(session_id, titulo, nota_fecha, comportamiento_trabajado, apuntes)
+VALUES (?, ?, ?, ?, ?);
+
+deleteEvolutionNotesBySession:
+DELETE FROM session_evolution_notes WHERE session_id = ?;

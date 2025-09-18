@@ -1,0 +1,17 @@
+CREATE TABLE session_biosocial (
+  session_id TEXT NOT NULL PRIMARY KEY REFERENCES patient_sessions(id) ON DELETE CASCADE,
+  vulnerabilidad_emocional TEXT,
+  sensibilidad TEXT,
+  intensidad TEXT,
+  lento_retorno_calma TEXT,
+  invalidacion_ambiental TEXT,
+  criticar_emociones TEXT,
+  otros TEXT
+);
+
+upsertBiosocial:
+INSERT OR REPLACE INTO session_biosocial(session_id, vulnerabilidad_emocional, sensibilidad, intensidad, lento_retorno_calma, invalidacion_ambiental, criticar_emociones, otros)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+selectBiosocial:
+SELECT * FROM session_biosocial WHERE session_id = ?;

@@ -1,0 +1,17 @@
+CREATE TABLE session_dysregulation (
+  session_id TEXT NOT NULL PRIMARY KEY REFERENCES patient_sessions(id) ON DELETE CASCADE,
+  emocional TEXT,
+  conductual TEXT,
+  interpersonal TEXT,
+  self_valores TEXT,
+  cognitiva TEXT,
+  resumen TEXT,
+  bsl23_aplicado INTEGER NOT NULL DEFAULT 0
+);
+
+upsertDysregulation:
+INSERT OR REPLACE INTO session_dysregulation(session_id, emocional, conductual, interpersonal, self_valores, cognitiva, resumen, bsl23_aplicado)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+selectDysregulation:
+SELECT * FROM session_dysregulation WHERE session_id = ?;

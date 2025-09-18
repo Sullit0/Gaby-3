@@ -1,0 +1,27 @@
+CREATE TABLE session_problem_analysis (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL REFERENCES patient_sessions(id) ON DELETE CASCADE,
+  problem_number INTEGER NOT NULL,
+  vulnerabilidad TEXT,
+  evento_externo TEXT,
+  pensamientos TEXT,
+  sensaciones TEXT,
+  impulsos TEXT,
+  emociones TEXT,
+  consecuencias_inmediatas TEXT,
+  consecuencias_demoradas TEXT,
+  plan_crisis TEXT,
+  analisis_solucion TEXT
+);
+
+CREATE INDEX problem_analysis_session_idx ON session_problem_analysis(session_id);
+
+selectProblemAnalysisBySession:
+SELECT * FROM session_problem_analysis WHERE session_id = ? ORDER BY problem_number, id;
+
+insertProblemAnalysis:
+INSERT INTO session_problem_analysis(session_id, problem_number, vulnerabilidad, evento_externo, pensamientos, sensaciones, impulsos, emociones, consecuencias_inmediatas, consecuencias_demoradas, plan_crisis, analisis_solucion)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteProblemAnalysisBySession:
+DELETE FROM session_problem_analysis WHERE session_id = ?;

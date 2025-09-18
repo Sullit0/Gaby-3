@@ -1,0 +1,11 @@
+CREATE TABLE session_problem_goals (
+  session_id TEXT NOT NULL PRIMARY KEY REFERENCES patient_sessions(id) ON DELETE CASCADE,
+  metas TEXT
+);
+
+upsertProblemGoals:
+INSERT OR REPLACE INTO session_problem_goals(session_id, metas)
+VALUES (?, ?);
+
+selectProblemGoals:
+SELECT * FROM session_problem_goals WHERE session_id = ?;

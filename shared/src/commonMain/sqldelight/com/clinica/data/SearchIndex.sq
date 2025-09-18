@@ -1,0 +1,21 @@
+CREATE VIRTUAL TABLE session_notes_fts USING fts5(
+  session_id,
+  motivo_principal,
+  otros_motivos,
+  content=''
+);
+
+CREATE TRIGGER session_notes_insert AFTER INSERT ON patient_sessions BEGIN
+  INSERT INTO session_notes_fts(session_id, motivo_principal, otros_motivos)
+  VALUES (new.id, new.motivo_principal, new.otros_motivos);
+END;
+
+CREATE TRIGGER session_notes_update AFTER UPDATE ON patient_sessions BEGIN
+  DELETE FROM session_notes_fts WHERE session_id = old.id;
+  INSERT INTO session_notes_fts(session_id, motivo_principal, otros_motivos)
+  VALUES (new.id, new.motivo_principal, new.otros_motivos);
+END;
+
+CREATE TRIGGER session_notes_delete AFTER DELETE ON patient_sessions BEGIN
+  DELETE FROM session_notes_fts WHERE session_id = old.id;
+END;
