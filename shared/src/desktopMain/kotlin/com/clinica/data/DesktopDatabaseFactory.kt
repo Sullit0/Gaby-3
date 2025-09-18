@@ -19,8 +19,9 @@ class DesktopDatabaseFactory(
         }
         val dbPath = basePath.resolve("psych_notes.db")
         val jdbcUrl = "jdbc:sqlite:${dbPath.toAbsolutePath().pathString}"
+        val needsInitialization = !dbPath.exists()
         val driver = JdbcSqliteDriver(url = jdbcUrl)
-        if (!dbPath.exists()) {
+        if (needsInitialization) {
             PsychNotesDb.Schema.create(driver)
         }
         return driver

@@ -4,6 +4,7 @@ data class ProblemAnalysis(
     val id: Long,
     val sessionId: String,
     val problemNumber: Int,
+    val comportamiento: String?,
     val vulnerabilidad: String?,
     val eventoExterno: String?,
     val pensamientos: String?,

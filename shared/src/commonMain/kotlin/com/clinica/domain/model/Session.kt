@@ -14,6 +14,7 @@ data class Session(
     val firstAttentionDate: LocalDate?,
     val motivoPrincipal: String?,
     val otrosMotivos: String?,
+    val familyNotes: String?,
     val createdAt: Instant,
     val updatedAt: Instant
 )

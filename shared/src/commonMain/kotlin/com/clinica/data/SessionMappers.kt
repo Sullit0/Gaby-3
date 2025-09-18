@@ -11,6 +11,7 @@ internal fun Patient_sessions.toDomain(): Session = Session(
     firstAttentionDate = DateTimeMapper.stringToLocalDate(first_attention_date),
     motivoPrincipal = motivo_principal,
     otrosMotivos = otros_motivos,
+    familyNotes = family_notes,
     createdAt = Instant.parse(created_at),
     updatedAt = Instant.parse(updated_at)
 )
@@ -74,6 +75,7 @@ internal fun Session_problem_analysis.toDomain(): ProblemAnalysis = ProblemAnaly
     id = id,
     sessionId = session_id,
     problemNumber = problem_number.toInt(),
+    comportamiento = comportamiento,
     vulnerabilidad = vulnerabilidad,
     eventoExterno = evento_externo,
     pensamientos = pensamientos,
@@ -100,7 +102,8 @@ internal fun Session_evolution_notes.toDomain(): EvolutionNote = EvolutionNote(
     titulo = titulo,
     notaFecha = nota_fecha,
     comportamientoTrabajado = comportamiento_trabajado,
-    apuntes = apuntes
+    apuntes = apuntes,
+    tareas = tareas
 )
 
 internal fun Attachments.toDomain(): Attachment = Attachment(

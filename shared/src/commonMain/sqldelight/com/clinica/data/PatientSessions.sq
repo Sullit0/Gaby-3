@@ -7,19 +7,20 @@ CREATE TABLE patient_sessions (
   motivo_principal TEXT,
   otros_motivos TEXT,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  family_notes TEXT
 );
 
 CREATE UNIQUE INDEX sessions_patient_code_idx ON patient_sessions(patient_id, session_code);
 CREATE INDEX sessions_date_idx ON patient_sessions(session_date);
 
 insertSession:
-INSERT INTO patient_sessions(id, patient_id, session_code, session_date, first_attention_date, motivo_principal, otros_motivos, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO patient_sessions(id, patient_id, session_code, session_date, first_attention_date, motivo_principal, otros_motivos, created_at, updated_at, family_notes)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 updateSession:
 UPDATE patient_sessions
-SET session_code = ?, session_date = ?, first_attention_date = ?, motivo_principal = ?, otros_motivos = ?, updated_at = ?
+SET session_code = ?, session_date = ?, first_attention_date = ?, motivo_principal = ?, otros_motivos = ?, updated_at = ?, family_notes = ?
 WHERE id = ?;
 
 selectSessionById:

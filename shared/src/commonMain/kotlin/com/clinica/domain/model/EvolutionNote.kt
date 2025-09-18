@@ -6,5 +6,6 @@ data class EvolutionNote(
     val titulo: String,
     val notaFecha: String?,
     val comportamientoTrabajado: String?,
-    val apuntes: String?
+    val apuntes: String?,
+    val tareas: String?
 )

@@ -1,0 +1,3 @@
+ALTER TABLE patient_sessions ADD COLUMN family_notes TEXT;
+ALTER TABLE session_evolution_notes ADD COLUMN tareas TEXT;
+ALTER TABLE session_problem_analysis ADD COLUMN comportamiento TEXT;

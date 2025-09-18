@@ -11,7 +11,8 @@ CREATE TABLE session_problem_analysis (
   consecuencias_inmediatas TEXT,
   consecuencias_demoradas TEXT,
   plan_crisis TEXT,
-  analisis_solucion TEXT
+  analisis_solucion TEXT,
+  comportamiento TEXT
 );
 
 CREATE INDEX problem_analysis_session_idx ON session_problem_analysis(session_id);
@@ -20,8 +21,8 @@ selectProblemAnalysisBySession:
 SELECT * FROM session_problem_analysis WHERE session_id = ? ORDER BY problem_number, id;
 
 insertProblemAnalysis:
-INSERT INTO session_problem_analysis(session_id, problem_number, vulnerabilidad, evento_externo, pensamientos, sensaciones, impulsos, emociones, consecuencias_inmediatas, consecuencias_demoradas, plan_crisis, analisis_solucion)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO session_problem_analysis(session_id, problem_number, vulnerabilidad, evento_externo, pensamientos, sensaciones, impulsos, emociones, consecuencias_inmediatas, consecuencias_demoradas, plan_crisis, analisis_solucion, comportamiento)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 deleteProblemAnalysisBySession:
 DELETE FROM session_problem_analysis WHERE session_id = ?;

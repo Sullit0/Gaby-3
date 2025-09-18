@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.clinica.app.AppInitializer
@@ -27,7 +28,7 @@ fun main() = application {
     Window(onCloseRequest = ::exitApplication, title = "Psych Notes") {
         MaterialTheme {
             Surface {
-                PsychNotesScreen(storageRoot)
+                PsychNotesScreen(storageRoot, window)
             }
         }
     }
@@ -35,7 +36,8 @@ fun main() = application {
 
 @Composable
 fun PsychNotesScreen(
-    storageRoot: Path = Path.of(System.getProperty("user.home"), ".psych-notes", "storage")
+    storageRoot: Path = Path.of(System.getProperty("user.home"), ".psych-notes", "storage"),
+    composeWindow: ComposeWindow? = null
 ) {
     Column(
         modifier = Modifier
@@ -48,7 +50,7 @@ fun PsychNotesScreen(
         Spacer(modifier = Modifier.padding(8.dp))
         Text("Inicia creando un paciente y una ficha. La interfaz final replicará la ficha original pero optimizada para digital.")
         Spacer(modifier = Modifier.padding(8.dp))
-        SessionFormScreen(storageRoot = storageRoot)
+        SessionFormScreen(storageRoot = storageRoot, composeWindow = composeWindow)
     }
 }
 

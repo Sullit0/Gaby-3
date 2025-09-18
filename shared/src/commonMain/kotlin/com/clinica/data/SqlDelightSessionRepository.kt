@@ -53,7 +53,8 @@ class SqlDelightSessionRepository(
             motivo_principal = null,
             otros_motivos = null,
             created_at = DateTimeMapper.instantToString(now),
-            updated_at = DateTimeMapper.instantToString(now)
+            updated_at = DateTimeMapper.instantToString(now),
+            family_notes = null
         )
         sessions.selectSessionById(id).executeAsOne().toDomain()
     }
@@ -75,6 +76,7 @@ class SqlDelightSessionRepository(
             motivo_principal = session.motivoPrincipal,
             otros_motivos = session.otrosMotivos,
             updated_at = DateTimeMapper.instantToString(session.updatedAt),
+            family_notes = session.familyNotes,
             id = session.id
         )
     }
@@ -202,7 +204,8 @@ class SqlDelightSessionRepository(
                 consecuencias_inmediatas = analysis.consecuenciasInmediatas,
                 consecuencias_demoradas = analysis.consecuenciasDemoradas,
                 plan_crisis = analysis.planCrisis,
-                analisis_solucion = analysis.analisisSolucion
+                analisis_solucion = analysis.analisisSolucion,
+                comportamiento = analysis.comportamiento
             )
         }
     }
@@ -221,7 +224,8 @@ class SqlDelightSessionRepository(
                 titulo = note.titulo,
                 nota_fecha = note.notaFecha,
                 comportamiento_trabajado = note.comportamientoTrabajado,
-                apuntes = note.apuntes
+                apuntes = note.apuntes,
+                tareas = note.tareas
             )
         }
     }

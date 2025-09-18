@@ -1,62 +1,113 @@
 package com.clinica.desktop
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.Divider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.clinica.app.form.SessionFormViewModel
+import androidx.compose.ui.awt.ComposeWindow
+import com.clinica.app.form.SessionFormMetadata
 import com.clinica.app.form.SessionFormState
+import com.clinica.app.form.SessionFormViewModel
 import com.clinica.domain.model.Attachment
+import com.clinica.domain.model.BiosocialModel
+import com.clinica.domain.model.DysregulationAreas
+import com.clinica.domain.model.PsychometricData
+import com.clinica.domain.model.TreatmentObjective
+import com.benasher44.uuid.uuid4
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import org.koin.core.context.GlobalContext
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
-import kotlinx.coroutines.launch
+import kotlinx.datetime.todayIn
+import kotlinx.datetime.periodUntil
+import kotlinx.datetime.atStartOfDayIn
+import org.koin.core.context.GlobalContext
 import java.awt.Desktop
 import java.awt.FileDialog
 import java.awt.Frame
+import java.awt.Point
+import java.awt.datatransfer.DataFlavor
+import java.awt.datatransfer.Transferable
+import java.awt.dnd.DnDConstants
+import java.awt.dnd.DropTarget
+import java.awt.dnd.DropTargetAdapter
+import java.awt.dnd.DropTargetDragEvent
+import java.awt.dnd.DropTargetDropEvent
+import java.awt.dnd.DropTargetEvent
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
-import com.benasher44.uuid.uuid4
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.DEFAULT_BUFFER_SIZE
+import kotlinx.datetime.toLocalDateTime
 
 @Composable
-fun SessionFormScreen(modifier: Modifier = Modifier, storageRoot: Path) {
+fun SessionFormScreen(
+    modifier: Modifier = Modifier,
+    storageRoot: Path,
+    composeWindow: ComposeWindow? = null
+) {
     val koin = GlobalContext.get()
     val viewModel = remember {
         SessionFormViewModel(
@@ -71,8 +122,30 @@ fun SessionFormScreen(modifier: Modifier = Modifier, storageRoot: Path) {
     }
 
     val state by viewModel.state.collectAsState()
-
     val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
+
+    val dropBoundsRef = remember { AtomicReference<Rect?>(null) }
+    var isDragHovering by remember { mutableStateOf(false) }
+
+    DesktopDropTargetHandler(
+        composeWindow = composeWindow,
+        boundsRef = dropBoundsRef,
+        onHoverChange = { isDragHovering = it },
+        onFilesDropped = { files ->
+            val patientId = state.patient?.id
+            val sessionId = state.session?.id
+            if (patientId == null || sessionId == null) return@DesktopDropTargetHandler
+            coroutineScope.launch(Dispatchers.IO) {
+                val created = processAttachments(files.toTypedArray(), storageRoot, patientId, sessionId)
+                created.forEach { attachment ->
+                    viewModel.registerAttachment(attachment)
+                    viewModel.appendAttachmentToken(attachment)
+                }
+            }
+        }
+    )
+
     if (state.isLoading) {
         Column(
             modifier = modifier.fillMaxWidth().padding(32.dp),
@@ -80,292 +153,617 @@ fun SessionFormScreen(modifier: Modifier = Modifier, storageRoot: Path) {
             verticalArrangement = Arrangement.Center
         ) {
             CircularProgressIndicator()
-            Spacer(modifier = Modifier.padding(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Text("Cargando ficha...")
         }
         return
     }
 
+    state.error?.let { errorMessage ->
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Text(
+                text = "Error: $errorMessage",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+
     Column(
         modifier = modifier
             .verticalScroll(scrollState)
-            .padding(bottom = 64.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(vertical = 24.dp)
+            .fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        SectionTitle("Identificación del paciente")
-        IdentificationSection(state, viewModel)
+        SectionCard(title = "Identificación del paciente") {
+            IdentificationSection(state, viewModel)
+        }
 
-        SectionTitle("Datos familiares de interés")
-        LargeTextField(label = "Descripción")
+        SectionCard(title = "Datos familiares de interés") {
+            ControlledLargeTextField(
+                label = "Descripción",
+                value = state.familyNotes,
+                onValueChange = { viewModel.updateFamilyNotes(it) },
+                placeholder = "Historia familiar, vínculos, hitos relevantes"
+            )
+        }
 
-        SectionTitle("Análisis en cadena de los problemas principales")
-        ProblemChainSection()
+        SectionCard(title = "Análisis en cadena de los problemas principales") {
+            ProblemChainSection(state, viewModel)
+            Spacer(modifier = Modifier.height(12.dp))
+            ControlledLargeTextField(
+                label = "Lista de metas asociadas a los problemas principales",
+                value = state.problemGoals?.metas.orEmpty(),
+                onValueChange = { viewModel.updateProblemGoals(it) }
+            )
+        }
 
-        SectionTitle("Datos psicométricos (de corresponder)")
-        PsychometricSection()
+        SectionCard(title = "Datos psicométricos (de corresponder)") {
+            PsychometricsSection(state, viewModel)
+        }
 
-        SectionTitle("Áreas de desregulación")
-        DysregulationSection()
+        SectionCard(title = "Áreas de desregulación") {
+            DysregulationSection(state, viewModel)
+        }
 
-        SectionTitle("Apuntes de evolución psicoterapéutica")
-        EvolutionSection()
+        SectionCard(title = "Modelo biosocial") {
+            BiosocialSection(state, viewModel)
+        }
 
-        SectionTitle("Tareas / Adjuntos de la sesión")
-        TasksSection(state, viewModel, storageRoot)
+        SectionCard(title = "Objetivos del tratamiento") {
+            TreatmentObjectivesSection(state, viewModel)
+        }
+
+        SectionCard(title = "Evolución de los objetivos") {
+            ProblemAnalysisSection(state, viewModel)
+        }
+
+        SectionCard(title = "Apuntes de evolución psicoterapéutica") {
+            EvolutionNotesSection(state, viewModel)
+        }
+
+        SectionCard(title = "Tareas / Adjuntos de la sesión") {
+            TasksSection(
+                state = state,
+                viewModel = viewModel,
+                storageRoot = storageRoot,
+                dropBoundsRef = dropBoundsRef,
+                isDragHovering = isDragHovering,
+                scope = coroutineScope
+            )
+        }
     }
 }
 
 @Composable
-private fun SectionTitle(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
-    )
+private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F7F9)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+            )
+            content()
+        }
+    }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun IdentificationSection(
-    state: SessionFormState,
-    viewModel: SessionFormViewModel
-) {
+private fun IdentificationSection(state: SessionFormState, viewModel: SessionFormViewModel) {
     val patient = state.patient
     val session = state.session
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        OutlinedTextField(
+            value = patient?.displayName.orEmpty(),
+            onValueChange = { viewModel.updatePatientName(it) },
+            label = { Text("Apellidos y nombres") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+            DatePickerField(
+                label = "Fecha de nacimiento",
+                value = patient?.birthDate,
+                onValueChange = { viewModel.updateBirthDate(it) },
+                modifier = Modifier.weight(1f)
+            )
+            AgeDisplay(modifier = Modifier.weight(1f), birthDate = patient?.birthDate)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+            DatePickerField(
+                label = "Fecha de primera atención",
+                value = session?.firstAttentionDate,
+                onValueChange = { viewModel.updateFirstAttentionDate(it) },
+                modifier = Modifier.weight(1f)
+            )
             OutlinedTextField(
-                value = patient?.displayName.orEmpty(),
-                onValueChange = { viewModel.updatePatientName(it) },
-                label = { Text("Apellidos y nombres") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = session?.firstAttentionDate?.toString().orEmpty(),
-                    onValueChange = { viewModel.updateFirstAttentionRaw(it) },
-                    label = { Text("Fecha de primera atención") },
-                    modifier = Modifier.weight(1f)
-                )
-                OutlinedTextField(
-                    value = patient?.gender.orEmpty(),
-                    onValueChange = { viewModel.updateGender(it) },
-                    label = { Text("Género") },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = patient?.birthDate?.toString().orEmpty(),
-                    onValueChange = { viewModel.updateBirthDateRaw(it) },
-                    label = { Text("Fecha de nacimiento") },
-                    modifier = Modifier.weight(1f)
-                )
-                OutlinedTextField(
-                    value = patient?.birthDate?.let { calculateAge(it).toString() }.orEmpty(),
-                    onValueChange = { },
-                    label = { Text("Edad") },
-                    enabled = false,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = patient?.address.orEmpty(),
-                    onValueChange = { viewModel.updateDireccion(it) },
-                    label = { Text("Dirección actual") },
-                    modifier = Modifier.weight(1f)
-                )
-                OutlinedTextField(
-                    value = patient?.dni.orEmpty(),
-                    onValueChange = { viewModel.updateDni(it) },
-                    label = { Text("Nº DNI") },
-                    modifier = Modifier.weight(1f)
-                )
-                OutlinedTextField(
-                    value = patient?.phone.orEmpty(),
-                    onValueChange = { viewModel.updatePhone(it) },
-                    label = { Text("Nº Celular") },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            ControlledLargeTextField(
-                label = "Motivo de consulta principal",
-                value = session?.motivoPrincipal.orEmpty(),
-                onValueChange = { viewModel.updateMotivoPrincipal(it) }
-            )
-            ControlledLargeTextField(
-                label = "Otros motivos a tratar",
-                value = session?.otrosMotivos.orEmpty(),
-                onValueChange = { viewModel.updateOtrosMotivos(it) }
+                value = patient?.gender.orEmpty(),
+                onValueChange = { viewModel.updateGender(it) },
+                label = { Text("Género") },
+                modifier = Modifier.weight(1f)
             )
         }
-    }
-}
-
-@Composable
-private fun LargeTextField(
-    label: String,
-    valueState: MutableState<String>? = null,
-) {
-    val state = valueState ?: remember { mutableStateOf("") }
-    OutlinedTextField(
-        value = state.value,
-        onValueChange = { state.value = it },
-        label = { Text(label) },
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 120.dp),
-        maxLines = 8
-    )
-}
-
-@Composable
-private fun ControlledLargeTextField(
-    label: String,
-    value: String,
-    onValueChange: (String) -> Unit
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label) },
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 120.dp),
-        maxLines = 8
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ProblemChainSection() {
-    val rows = remember {
-        mutableStateOf(
-            listOf(
-                ProblemChainRowState("P1"),
-                ProblemChainRowState("P2"),
-                ProblemChainRowState("P3"),
-                ProblemChainRowState("P4")
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = patient?.address.orEmpty(),
+                onValueChange = { viewModel.updateDireccion(it) },
+                label = { Text("Dirección actual") },
+                modifier = Modifier.weight(1f)
             )
+            OutlinedTextField(
+                value = patient?.dni.orEmpty(),
+                onValueChange = { viewModel.updateDni(it) },
+                label = { Text("Nº DNI") },
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedTextField(
+                value = patient?.phone.orEmpty(),
+                onValueChange = { viewModel.updatePhone(it) },
+                label = { Text("Nº Celular") },
+                modifier = Modifier.weight(1f)
+            )
+        }
+        ControlledLargeTextField(
+            label = "Motivo de consulta principal",
+            value = session?.motivoPrincipal.orEmpty(),
+            onValueChange = { viewModel.updateMotivoPrincipal(it) }
+        )
+        ControlledLargeTextField(
+            label = "Otros motivos a tratar",
+            value = session?.otrosMotivos.orEmpty(),
+            onValueChange = { viewModel.updateOtrosMotivos(it) }
         )
     }
+}
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        rows.value.forEach { rowState ->
+@Composable
+private fun ProblemChainSection(state: SessionFormState, viewModel: SessionFormViewModel) {
+    val chains = state.problemChains
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        chains.forEach { entry ->
             Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(rowState.label, style = MaterialTheme.typography.titleMedium)
-                    OutlinedTextField(
-                        value = rowState.vulnerabilidades.value,
-                        onValueChange = { rowState.vulnerabilidades.value = it },
-                        label = { Text("Vulnerabilidades") },
-                        modifier = Modifier.fillMaxWidth()
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = entry.label,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium)
                     )
-                    OutlinedTextField(
-                        value = rowState.evento.value,
-                        onValueChange = { rowState.evento.value = it },
-                        label = { Text("Evento desencadenante") },
-                        modifier = Modifier.fillMaxWidth()
+                    ControlledLargeTextField(
+                        label = "Vulnerabilidades",
+                        value = entry.vulnerabilidades.orEmpty(),
+                        onValueChange = { value ->
+                            viewModel.updateProblemChain(entry.label) { it.copy(vulnerabilidades = value) }
+                        }
                     )
-                    OutlinedTextField(
-                        value = rowState.eslabones.value,
-                        onValueChange = { rowState.eslabones.value = it },
-                        label = { Text("Eslabones") },
-                        modifier = Modifier.fillMaxWidth()
+                    ControlledLargeTextField(
+                        label = "Evento desencadenante",
+                        value = entry.eventoDesencadenante.orEmpty(),
+                        onValueChange = { value ->
+                            viewModel.updateProblemChain(entry.label) { it.copy(eventoDesencadenante = value) }
+                        }
                     )
-                    OutlinedTextField(
-                        value = rowState.problemas.value,
-                        onValueChange = { rowState.problemas.value = it },
-                        label = { Text("Problemas de conducta o crisis") },
-                        modifier = Modifier.fillMaxWidth()
+                    ControlledLargeTextField(
+                        label = "Eslabones",
+                        value = entry.eslabones.orEmpty(),
+                        onValueChange = { value ->
+                            viewModel.updateProblemChain(entry.label) { it.copy(eslabones = value) }
+                        }
                     )
-                    OutlinedTextField(
-                        value = rowState.consecuentes.value,
-                        onValueChange = { rowState.consecuentes.value = it },
-                        label = { Text("Consecuentes") },
-                        modifier = Modifier.fillMaxWidth()
+                    ControlledLargeTextField(
+                        label = "Problemas de conducta o crisis",
+                        value = entry.problemasConducta.orEmpty(),
+                        onValueChange = { value ->
+                            viewModel.updateProblemChain(entry.label) { it.copy(problemasConducta = value) }
+                        }
+                    )
+                    ControlledLargeTextField(
+                        label = "Consecuentes",
+                        value = entry.consecuentes.orEmpty(),
+                        onValueChange = { value ->
+                            viewModel.updateProblemChain(entry.label) { it.copy(consecuentes = value) }
+                        }
                     )
                 }
             }
         }
-        LargeTextField(label = "Lista de metas asociadas")
     }
 }
 
-private data class ProblemChainRowState(
-    val label: String,
-    val vulnerabilidades: MutableState<String> = mutableStateOf(""),
-    val evento: MutableState<String> = mutableStateOf(""),
-    val eslabones: MutableState<String> = mutableStateOf(""),
-    val problemas: MutableState<String> = mutableStateOf(""),
-    val consecuentes: MutableState<String> = mutableStateOf("")
-)
-
 @Composable
-private fun PsychometricSection() {
-    LargeTextField(label = "Cociente intelectual (dato cuantitativo y clasificación)")
-    LargeTextField(label = "Temperamento")
-    LargeTextField(label = "Personalidad y rasgos importantes")
-    LargeTextField(label = "Atención y concentración")
-    LargeTextField(label = "Problemas de conducta")
-    LargeTextField(label = "Dinámica familiar")
-    LargeTextField(label = "Otros de interés")
+private fun PsychometricsSection(state: SessionFormState, viewModel: SessionFormViewModel) {
+    val data = state.psychometrics ?: defaultPsychometricsStub(state.session?.id)
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+            ControlledLargeTextField(
+                label = "Cociente intelectual - dato cuantitativo",
+                value = data.coeficienteValor.orEmpty(),
+                onValueChange = { value ->
+                    viewModel.updatePsychometrics { it.copy(coeficienteValor = value) }
+                },
+                modifier = Modifier.weight(1f),
+                minHeight = 80.dp
+            )
+            ControlledLargeTextField(
+                label = "Cociente intelectual - clasificación",
+                value = data.coeficienteClasificacion.orEmpty(),
+                onValueChange = { value ->
+                    viewModel.updatePsychometrics { it.copy(coeficienteClasificacion = value) }
+                },
+                modifier = Modifier.weight(1f),
+                minHeight = 80.dp
+            )
+        }
+        ControlledLargeTextField(
+            label = "Temperamento",
+            value = data.temperamento.orEmpty(),
+            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(temperamento = value) } }
+        )
+        ControlledLargeTextField(
+            label = "Personalidad y rasgos importantes",
+            value = data.personalidad.orEmpty(),
+            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(personalidad = value) } }
+        )
+        ControlledLargeTextField(
+            label = "Atención y concentración",
+            value = data.atencion.orEmpty(),
+            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(atencion = value) } }
+        )
+        ControlledLargeTextField(
+            label = "Problemas de conducta",
+            value = data.problemasConducta.orEmpty(),
+            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(problemasConducta = value) } }
+        )
+        ControlledLargeTextField(
+            label = "Dinámica familiar",
+            value = data.dinamicaFamiliar.orEmpty(),
+            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(dinamicaFamiliar = value) } }
+        )
+        ControlledLargeTextField(
+            label = "Otros de interés",
+            value = data.otrosInteres.orEmpty(),
+            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(otrosInteres = value) } }
+        )
+    }
 }
 
 @Composable
-private fun DysregulationSection() {
-    LargeTextField(label = "Emocional")
-    LargeTextField(label = "Conductual")
-    LargeTextField(label = "Interpersonal")
-    LargeTextField(label = "Del self - valores")
-    LargeTextField(label = "Cognitiva")
-    LargeTextField(label = "Resumen")
+private fun DysregulationSection(state: SessionFormState, viewModel: SessionFormViewModel) {
+    val data = state.dysregulation ?: defaultDysregulationStub(state.session?.id)
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        ControlledLargeTextField(
+            label = "Emocional",
+            value = data.emocional.orEmpty(),
+            onValueChange = { value -> viewModel.updateDysregulation { it.copy(emocional = value) } }
+        )
+        ControlledLargeTextField(
+            label = "Conductual",
+            value = data.conductual.orEmpty(),
+            onValueChange = { value -> viewModel.updateDysregulation { it.copy(conductual = value) } }
+        )
+        ControlledLargeTextField(
+            label = "Interpersonal",
+            value = data.interpersonal.orEmpty(),
+            onValueChange = { value -> viewModel.updateDysregulation { it.copy(interpersonal = value) } }
+        )
+        ControlledLargeTextField(
+            label = "Del self - valores",
+            value = data.selfValores.orEmpty(),
+            onValueChange = { value -> viewModel.updateDysregulation { it.copy(selfValores = value) } }
+        )
+        ControlledLargeTextField(
+            label = "Cognitiva",
+            value = data.cognitiva.orEmpty(),
+            onValueChange = { value -> viewModel.updateDysregulation { it.copy(cognitiva = value) } }
+        )
+        ControlledLargeTextField(
+            label = "Resumen",
+            value = data.resumen.orEmpty(),
+            onValueChange = { value -> viewModel.updateDysregulation { it.copy(resumen = value) } }
+        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Aplicación de BsL-23 (siempre y cuando se sospeche de TLP)")
+            Switch(
+                checked = data.bsl23Aplicado,
+                onCheckedChange = { checked -> viewModel.updateDysregulation { it.copy(bsl23Aplicado = checked) } }
+            )
+        }
+    }
 }
 
 @Composable
-private fun EvolutionSection() {
-    LargeTextField(label = "Sesión I - Apuntes")
-    LargeTextField(label = "Tareas previas")
+private fun BiosocialSection(state: SessionFormState, viewModel: SessionFormViewModel) {
+    val data = state.biosocial ?: defaultBiosocialStub(state.session?.id)
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        ControlledLargeTextField(
+            label = "Vulnerabilidad emocional",
+            value = data.vulnerabilidadEmocional.orEmpty(),
+            onValueChange = { value -> viewModel.updateBiosocial { it.copy(vulnerabilidadEmocional = value) } }
+        )
+        ControlledLargeTextField(
+            label = "Sensibilidad",
+            value = data.sensibilidad.orEmpty(),
+            onValueChange = { value -> viewModel.updateBiosocial { it.copy(sensibilidad = value) } }
+        )
+        ControlledLargeTextField(
+            label = "Intensidad",
+            value = data.intensidad.orEmpty(),
+            onValueChange = { value -> viewModel.updateBiosocial { it.copy(intensidad = value) } }
+        )
+        ControlledLargeTextField(
+            label = "Lento retorno a la calma",
+            value = data.lentoRetornoCalma.orEmpty(),
+            onValueChange = { value -> viewModel.updateBiosocial { it.copy(lentoRetornoCalma = value) } }
+        )
+        ControlledLargeTextField(
+            label = "Invalidación ambiental",
+            value = data.invalidacionAmbiental.orEmpty(),
+            onValueChange = { value -> viewModel.updateBiosocial { it.copy(invalidacionAmbiental = value) } }
+        )
+        ControlledLargeTextField(
+            label = "Criticar emociones",
+            value = data.criticarEmociones.orEmpty(),
+            onValueChange = { value -> viewModel.updateBiosocial { it.copy(criticarEmociones = value) } }
+        )
+        ControlledLargeTextField(
+            label = "Otros",
+            value = data.otros.orEmpty(),
+            onValueChange = { value -> viewModel.updateBiosocial { it.copy(otros = value) } }
+        )
+    }
 }
 
 @Composable
-private fun TasksSection(state: SessionFormState, viewModel: SessionFormViewModel, storageRoot: Path) {
-    ControlledLargeTextField(
-        label = "Descripción de tareas",
-        value = state.tasks?.descripcion.orEmpty(),
-        onValueChange = { viewModel.updateTasks(it) }
-    )
-    Spacer(modifier = Modifier.padding(vertical = 8.dp))
-    AttachmentControls(state, viewModel, storageRoot)
-}
-
-@Composable
-private fun AttachmentControls(state: SessionFormState, viewModel: SessionFormViewModel, storageRoot: Path) {
-    val patientId = state.patient?.id
-    val sessionId = state.session?.id
-    val scope = rememberCoroutineScope()
-
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-        Button(onClick = {
-            if (patientId == null || sessionId == null) return@Button
-            val files = chooseFiles() ?: return@Button
-            scope.launch(Dispatchers.IO) {
-                val created = processAttachments(files, storageRoot, patientId, sessionId)
-                created.forEach { attachment ->
-                    viewModel.registerAttachment(attachment)
+private fun TreatmentObjectivesSection(state: SessionFormState, viewModel: SessionFormViewModel) {
+    val objectives = state.treatmentObjectives
+    val grouped = SessionFormMetadata.treatmentFields.groupBy { it.stage }
+    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        grouped.forEach { (stage, definitions) ->
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = stageLabel(stage),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium)
+                )
+                definitions.forEach { definition ->
+                    val value = objectives.firstOrNull { it.stage == stage && it.field == definition.field }?.value.orEmpty()
+                    ControlledLargeTextField(
+                        label = definition.label,
+                        value = value,
+                        onValueChange = { text -> viewModel.updateTreatmentObjective(stage, definition.field, text) }
+                    )
                 }
             }
-        }) {
-            Text("Agregar archivos")
+            if (stage != grouped.keys.last()) {
+                Divider(modifier = Modifier.padding(vertical = 8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProblemAnalysisSection(state: SessionFormState, viewModel: SessionFormViewModel) {
+    val analyses = state.problemAnalyses.sortedBy { it.problemNumber }
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        analyses.forEach { analysis ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Comportamiento problema ${analysis.problemNumber} (DFI)",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium)
+                    )
+                    ControlledLargeTextField(
+                        label = "Descripción",
+                        value = analysis.comportamiento.orEmpty(),
+                        onValueChange = { value ->
+                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(comportamiento = value) }
+                        }
+                    )
+                    ControlledLargeTextField(
+                        label = "Análisis de la solución",
+                        value = analysis.analisisSolucion.orEmpty(),
+                        onValueChange = { value ->
+                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(analisisSolucion = value) }
+                        }
+                    )
+                    ControlledLargeTextField(
+                        label = "Vulnerabilidad",
+                        value = analysis.vulnerabilidad.orEmpty(),
+                        onValueChange = { value ->
+                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(vulnerabilidad = value) }
+                        }
+                    )
+                    ControlledLargeTextField(
+                        label = "Evento precipitante externo",
+                        value = analysis.eventoExterno.orEmpty(),
+                        onValueChange = { value ->
+                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(eventoExterno = value) }
+                        }
+                    )
+                    ControlledLargeTextField(
+                        label = "Pensamientos",
+                        value = analysis.pensamientos.orEmpty(),
+                        onValueChange = { value ->
+                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(pensamientos = value) }
+                        }
+                    )
+                    ControlledLargeTextField(
+                        label = "Sensaciones",
+                        value = analysis.sensaciones.orEmpty(),
+                        onValueChange = { value ->
+                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(sensaciones = value) }
+                        }
+                    )
+                    ControlledLargeTextField(
+                        label = "Impulsos",
+                        value = analysis.impulsos.orEmpty(),
+                        onValueChange = { value ->
+                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(impulsos = value) }
+                        }
+                    )
+                    ControlledLargeTextField(
+                        label = "Emociones",
+                        value = analysis.emociones.orEmpty(),
+                        onValueChange = { value ->
+                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(emociones = value) }
+                        }
+                    )
+                    ControlledLargeTextField(
+                        label = "Consecuencias inmediatas reforzantes",
+                        value = analysis.consecuenciasInmediatas.orEmpty(),
+                        onValueChange = { value ->
+                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(consecuenciasInmediatas = value) }
+                        }
+                    )
+                    ControlledLargeTextField(
+                        label = "Consecuencias demoradas",
+                        value = analysis.consecuenciasDemoradas.orEmpty(),
+                        onValueChange = { value ->
+                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(consecuenciasDemoradas = value) }
+                        }
+                    )
+                    ControlledLargeTextField(
+                        label = "Resuma el plan de crisis",
+                        value = analysis.planCrisis.orEmpty(),
+                        onValueChange = { value ->
+                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(planCrisis = value) }
+                        }
+                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        TextButton(onClick = { viewModel.removeProblemAnalysis(analysis.problemNumber) }) {
+                            Icon(Icons.Outlined.Delete, contentDescription = null)
+                            Spacer(Modifier.width(4.dp))
+                            Text("Eliminar problema")
+                        }
+                        Text(
+                            text = "#${analysis.problemNumber}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.Gray,
+                            modifier = Modifier.align(Alignment.CenterVertically)
+                        )
+                    }
+                }
+            }
+        }
+        Button(onClick = { viewModel.addProblemAnalysis() }) {
+            Text("Agregar comportamiento problema")
+        }
+    }
+}
+
+@Composable
+private fun EvolutionNotesSection(state: SessionFormState, viewModel: SessionFormViewModel) {
+    val notes = state.evolutionNotes
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        notes.forEach { note ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = note.titulo,
+                            onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(titulo = value) } },
+                            label = { Text("Sesión") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        OutlinedTextField(
+                            value = note.notaFecha.orEmpty(),
+                            onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(notaFecha = value) } },
+                            label = { Text("Fecha") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    ControlledLargeTextField(
+                        label = "Comportamiento problema trabajado",
+                        value = note.comportamientoTrabajado.orEmpty(),
+                        onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(comportamientoTrabajado = value) } }
+                    )
+                    ControlledLargeTextField(
+                        label = "Apuntes",
+                        value = note.apuntes.orEmpty(),
+                        onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(apuntes = value) } }
+                    )
+                    ControlledLargeTextField(
+                        label = "Tareas",
+                        value = note.tareas.orEmpty(),
+                        onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(tareas = value) } }
+                    )
+                    TextButton(onClick = { viewModel.removeEvolutionNote(note.id) }) {
+                        Icon(Icons.Outlined.Delete, contentDescription = null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Eliminar registro")
+                    }
+                }
+            }
+        }
+        Button(onClick = { viewModel.addEvolutionNote() }) {
+            Text("Agregar sesión")
+        }
+    }
+}
+
+@Composable
+private fun TasksSection(
+    state: SessionFormState,
+    viewModel: SessionFormViewModel,
+    storageRoot: Path,
+    dropBoundsRef: AtomicReference<Rect?>,
+    isDragHovering: Boolean,
+    scope: CoroutineScope
+) {
+    val patientId = state.patient?.id
+    val sessionId = state.session?.id
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        AttachmentTasksField(
+            value = state.tasks?.descripcion.orEmpty(),
+            onValueChange = { viewModel.updateTasks(it.takeIf { text -> text.isNotBlank() }) },
+            isDragHovering = isDragHovering,
+            dropBoundsRef = dropBoundsRef
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            FilledTonalIconButton(onClick = {
+                if (patientId == null || sessionId == null) return@FilledTonalIconButton
+                val files = chooseFiles() ?: return@FilledTonalIconButton
+                scope.launch(Dispatchers.IO) {
+                    val created = processAttachments(files, storageRoot, patientId, sessionId)
+                    created.forEach { attachment ->
+                        viewModel.registerAttachment(attachment)
+                        viewModel.appendAttachmentToken(attachment)
+                    }
+                }
+            }) {
+                Icon(Icons.Outlined.Add, contentDescription = "Agregar archivo")
+            }
+            Text("Agregar archivo", style = MaterialTheme.typography.labelLarge)
+            if (isDragHovering) {
+                Text(
+                    text = "Suelta los archivos para adjuntar",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.CenterVertically)
+                )
+            }
         }
 
-        if (state.attachments.isEmpty()) {
-            Text("Aún no hay archivos adjuntos", style = MaterialTheme.typography.bodyMedium)
-        } else {
+        if (state.attachments.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 state.attachments.forEach { attachment ->
                     AttachmentRow(
@@ -373,45 +771,296 @@ private fun AttachmentControls(state: SessionFormState, viewModel: SessionFormVi
                         storageRoot = storageRoot,
                         patientId = patientId,
                         onOpen = { openAttachment(it) },
-                        onRemove = { path ->
-                            scope.launch(Dispatchers.IO) {
-                                Files.deleteIfExists(path)
-                                viewModel.removeAttachment(attachment.id)
-                            }
+                        onRemove = { filePath ->
+                            viewModel.removeAttachment(attachment.id)
+                            scope.launch(Dispatchers.IO) { Files.deleteIfExists(filePath) }
                         }
                     )
                 }
             }
         }
 
-        DropZonePlaceholder()
     }
 }
 
 @Composable
-private fun DropZonePlaceholder() {
-    Column(
+private fun AttachmentTasksField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    isDragHovering: Boolean,
+    dropBoundsRef: AtomicReference<Rect?>
+) {
+    var fieldValue by remember { mutableStateOf(TextFieldValue(value)) }
+    LaunchedEffect(value) {
+        if (value != fieldValue.text) {
+            fieldValue = fieldValue.copy(text = value, selection = TextRange(value.length))
+        }
+    }
+
+    val highlightStyle = SpanStyle(
+        background = MaterialTheme.colorScheme.secondaryContainer,
+        color = MaterialTheme.colorScheme.onSecondaryContainer,
+        fontWeight = FontWeight.Medium
+    )
+    val tokenTransformation = remember(highlightStyle) { TokenHighlightTransformation(highlightStyle) }
+    val borderColor = if (isDragHovering) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+
+    OutlinedTextField(
+        value = fieldValue,
+        onValueChange = {
+            fieldValue = it
+            onValueChange(it.text)
+        },
+        label = { Text("Descripción de tareas") },
+        placeholder = { Text("Describe las tareas y añade tags como [archivo.pdf]") },
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFE0E0E0))
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text("Arrastra y suelta archivos aquí (próximamente)")
-        Text("PDF, DOCX, JPG, PNG", style = MaterialTheme.typography.bodySmall)
+            .heightIn(min = 160.dp)
+            .onGloballyPositioned { coordinates ->
+                dropBoundsRef.set(coordinates.boundsInWindow())
+            },
+        textStyle = MaterialTheme.typography.bodyMedium,
+        visualTransformation = tokenTransformation,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = borderColor,
+            unfocusedBorderColor = borderColor,
+            cursorColor = MaterialTheme.colorScheme.primary,
+            focusedLabelColor = MaterialTheme.colorScheme.primary
+        )
+    )
+}
+
+private class TokenHighlightTransformation(
+    private val style: SpanStyle,
+    private val regex: Regex = "\\[[^\\]]+\\]".toRegex()
+) : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val builder = AnnotatedString.Builder(text.text)
+        regex.findAll(text.text).forEach { match ->
+            builder.addStyle(style, match.range.first, match.range.last + 1)
+        }
+        return TransformedText(builder.toAnnotatedString(), OffsetMapping.Identity)
     }
 }
 
-private fun calculateAge(birthDate: LocalDate): Int {
-    val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
-    var age = today.year - birthDate.year
-    val birthdayThisYear = LocalDate(today.year, birthDate.monthNumber, birthDate.dayOfMonth)
-    if (today < birthdayThisYear) {
-        age -= 1
+@Composable
+private fun AttachmentRow(
+    attachment: Attachment,
+    storageRoot: Path,
+    patientId: String?,
+    onOpen: (Path) -> Unit,
+    onRemove: (Path) -> Unit
+) {
+    val path = remember(patientId, attachment) {
+        patientId?.let { pid ->
+            storageRoot.resolve(pid).resolve(attachment.sessionId).resolve(attachment.storedName)
+        }
     }
-    return age
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = attachment.displayName,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = { path?.let(onOpen) }, enabled = path != null) {
+                Text("Abrir")
+            }
+            TextButton(onClick = { path?.let(onRemove) }, enabled = path != null) {
+                Text("Eliminar")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ControlledLargeTextField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    minHeight: Dp = 120.dp
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        placeholder = placeholder?.let { { Text(it) } },
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = minHeight),
+        textStyle = MaterialTheme.typography.bodyMedium,
+        maxLines = Int.MAX_VALUE
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DatePickerField(
+    label: String,
+    value: LocalDate?,
+    onValueChange: (LocalDate?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showDialog by rememberSaveable { mutableStateOf(false) }
+    val textValue = value?.let { formatDate(it) }.orEmpty()
+
+    OutlinedTextField(
+        value = textValue,
+        onValueChange = {},
+        readOnly = true,
+        label = { Text(label) },
+        trailingIcon = {
+            IconButton(onClick = { showDialog = true }) {
+                Icon(Icons.Outlined.DateRange, contentDescription = "Seleccionar fecha")
+            }
+        },
+        modifier = modifier
+    )
+
+    if (showDialog) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = value?.toEpochMillis())
+        DatePickerDialog(
+            onDismissRequest = { showDialog = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val selected = datePickerState.selectedDateMillis?.toLocalDate()
+                    onValueChange(selected)
+                    showDialog = false
+                }) {
+                    Text("Aceptar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    onValueChange(null)
+                    showDialog = false
+                }) {
+                    Text("Limpiar")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState, showModeToggle = false)
+        }
+    }
+}
+
+@Composable
+private fun AgeDisplay(modifier: Modifier, birthDate: LocalDate?) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Edad",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        val ageText = birthDate?.let { "${calculateAge(it)} años" } ?: "—"
+        Text(
+            text = ageText,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@Composable
+private fun DesktopDropTargetHandler(
+    composeWindow: ComposeWindow?,
+    boundsRef: AtomicReference<Rect?>,
+    onHoverChange: (Boolean) -> Unit,
+    onFilesDropped: (List<File>) -> Unit
+) {
+    val scope = rememberCoroutineScope()
+
+    DisposableEffect(composeWindow) {
+        val window = composeWindow ?: return@DisposableEffect onDispose { }
+        val component = window.contentPane
+        val originalTarget = component.dropTarget
+        val listener = object : DropTargetAdapter() {
+            override fun dragEnter(dtde: DropTargetDragEvent) = handleDrag(dtde)
+            override fun dragOver(dtde: DropTargetDragEvent) = handleDrag(dtde)
+            override fun dragExit(dte: DropTargetEvent) {
+                scope.launch { onHoverChange(false) }
+            }
+
+            override fun drop(dtde: DropTargetDropEvent) {
+                val rect = boundsRef.get()
+                val inside = rect != null && rect.containsPoint(dtde.location)
+                scope.launch { onHoverChange(false) }
+                if (!inside) {
+                    dtde.rejectDrop()
+                    return
+                }
+                dtde.acceptDrop(DnDConstants.ACTION_COPY)
+                val files = extractFiles(dtde.transferable)
+                dtde.dropComplete(true)
+                if (files.isNotEmpty()) {
+                    scope.launch { onFilesDropped(files) }
+                }
+            }
+
+            private fun handleDrag(event: DropTargetDragEvent) {
+                val rect = boundsRef.get()
+                val inside = rect != null && rect.containsPoint(event.location)
+                if (inside) {
+                    event.acceptDrag(DnDConstants.ACTION_COPY)
+                } else {
+                    event.rejectDrag()
+                }
+                scope.launch { onHoverChange(inside) }
+            }
+        }
+
+        val dropTarget = DropTarget(component, DnDConstants.ACTION_COPY, listener, true)
+        component.dropTarget = dropTarget
+        onDispose {
+            dropTarget.setComponent(null)
+            component.dropTarget = originalTarget
+            scope.launch { onHoverChange(false) }
+        }
+    }
+}
+
+private fun Rect.containsPoint(point: Point): Boolean {
+    return point.x.toFloat() in left..right && point.y.toFloat() in top..bottom
+}
+
+private fun extractFiles(transferable: Transferable): List<File> {
+    return try {
+        when {
+            transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor) -> {
+                val data = transferable.getTransferData(DataFlavor.javaFileListFlavor)
+                if (data is List<*>) data.filterIsInstance<File>() else emptyList()
+            }
+            else -> emptyList()
+        }
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+private fun stageLabel(stage: TreatmentObjective.Stage): String = when (stage) {
+    TreatmentObjective.Stage.ETAPA_1 -> "Etapa 1"
+    TreatmentObjective.Stage.ETAPA_2 -> "Etapa 2"
+    TreatmentObjective.Stage.ETAPA_3 -> "Etapa 3"
+    TreatmentObjective.Stage.SECUNDARIOS -> "Objetivos secundarios"
+}
+
+private fun calculateAge(birthDate: LocalDate): Int {
+    val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
+    if (birthDate > today) return 0
+    return birthDate.periodUntil(today).years
 }
 
 private fun chooseFiles(): Array<File>? {
@@ -466,56 +1115,53 @@ private fun processAttachments(
     return created
 }
 
-@Composable
-private fun AttachmentRow(
-    attachment: Attachment,
-    storageRoot: Path,
-    patientId: String?,
-    onOpen: (Path) -> Unit,
-    onRemove: (Path) -> Unit
-) {
-    val path = patientId?.let { storageRoot.resolve(it).resolve(attachment.sessionId).resolve(attachment.storedName) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFFF0F0F0))
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(attachment.displayName, style = MaterialTheme.typography.bodyLarge)
-            val sizeLabel = attachment.sizeBytes?.let { humanReadableSize(it) } ?: "Tamaño desconocido"
-            Text(sizeLabel, style = MaterialTheme.typography.bodySmall)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            val canOpen = path?.let { Files.exists(it) } == true
-            Button(
-                onClick = { path?.let { if (Files.exists(it)) onOpen(it) } },
-                enabled = canOpen
-            ) {
-                Text("Abrir")
-            }
-            Button(
-                onClick = { path?.let { onRemove(it) } },
-                enabled = path != null
-            ) {
-                Text("Eliminar")
-            }
-        }
-    }
-}
-
-private fun humanReadableSize(size: Long): String {
-    if (size <= 0) return "0 B"
-    val units = arrayOf("B", "KB", "MB", "GB", "TB")
-    val digitGroups = (Math.log10(size.toDouble()) / Math.log10(1024.0)).toInt()
-    return String.format("%.1f %s", size / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
-}
-
 private fun openAttachment(path: Path) {
     if (Desktop.isDesktopSupported()) {
         Desktop.getDesktop().open(path.toFile())
     }
 }
+
+private fun formatDate(date: LocalDate): String = date.toString()
+
+private fun LocalDate.toEpochMillis(): Long =
+    this.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
+
+private fun Long.toLocalDate(): LocalDate =
+    Instant.fromEpochMilliseconds(this).toLocalDateTime(TimeZone.UTC).date
+
+private fun defaultPsychometricsStub(sessionId: String?): PsychometricData =
+    PsychometricData(
+        sessionId = sessionId.orEmpty(),
+        coeficienteValor = null,
+        coeficienteClasificacion = null,
+        temperamento = null,
+        personalidad = null,
+        atencion = null,
+        problemasConducta = null,
+        dinamicaFamiliar = null,
+        otrosInteres = null
+    )
+
+private fun defaultDysregulationStub(sessionId: String?): DysregulationAreas =
+    DysregulationAreas(
+        sessionId = sessionId.orEmpty(),
+        emocional = null,
+        conductual = null,
+        interpersonal = null,
+        selfValores = null,
+        cognitiva = null,
+        resumen = null,
+        bsl23Aplicado = false
+    )
+
+private fun defaultBiosocialStub(sessionId: String?) =
+    BiosocialModel(
+        sessionId = sessionId.orEmpty(),
+        vulnerabilidadEmocional = null,
+        sensibilidad = null,
+        intensidad = null,
+        lentoRetornoCalma = null,
+        invalidacionAmbiental = null,
+        criticarEmociones = null,
+        otros = null
+    )
