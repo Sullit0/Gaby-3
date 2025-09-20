@@ -1,9 +1,15 @@
 package com.clinica.desktop
 
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -11,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -27,7 +34,6 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -46,13 +52,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -60,6 +71,8 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.awt.ComposeWindow
 import com.clinica.app.form.SessionFormMetadata
 import com.clinica.app.form.SessionFormState
@@ -101,6 +114,7 @@ import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.DEFAULT_BUFFER_SIZE
 import kotlinx.datetime.toLocalDateTime
+import androidx.compose.ui.unit.toSize
 
 @Composable
 fun SessionFormScreen(
@@ -229,21 +243,45 @@ fun SessionFormScreen(
             EvolutionNotesSection(state, viewModel)
         }
 
-        SectionCard(title = "Tareas / Adjuntos de la sesión") {
+        SectionCard(
+            title = "Tareas / Adjuntos de la sesión",
+            actions = {
+                IconButton(
+                    onClick = {
+                        val patientId = state.patient?.id ?: return@IconButton
+                        val sessionId = state.session?.id ?: return@IconButton
+                        val files = chooseFiles() ?: return@IconButton
+                        coroutineScope.launch(Dispatchers.IO) {
+                            val created = processAttachments(files, storageRoot, patientId, sessionId)
+                            created.forEach { attachment ->
+                                viewModel.registerAttachment(attachment)
+                                viewModel.appendAttachmentToken(attachment)
+                            }
+                        }
+                    },
+                    enabled = state.patient != null && state.session != null
+                ) {
+                    Icon(Icons.Outlined.Add, contentDescription = "Adjuntar archivo")
+                }
+            }
+        ) {
             TasksSection(
                 state = state,
                 viewModel = viewModel,
                 storageRoot = storageRoot,
                 dropBoundsRef = dropBoundsRef,
-                isDragHovering = isDragHovering,
-                scope = coroutineScope
+                isDragHovering = isDragHovering
             )
         }
     }
 }
 
 @Composable
-private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
+private fun SectionCard(
+    title: String,
+    actions: (@Composable RowScope.() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
     Card(
         colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F7F9)),
         modifier = Modifier
@@ -256,10 +294,23 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = if (actions == null) Arrangement.Start else Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                )
+                if (actions != null) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        content = actions
+                    )
+                }
+            }
             content()
         }
     }
@@ -722,75 +773,47 @@ private fun TasksSection(
     viewModel: SessionFormViewModel,
     storageRoot: Path,
     dropBoundsRef: AtomicReference<Rect?>,
-    isDragHovering: Boolean,
-    scope: CoroutineScope
+    isDragHovering: Boolean
 ) {
     val patientId = state.patient?.id
-    val sessionId = state.session?.id
-
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         AttachmentTasksField(
             value = state.tasks?.descripcion.orEmpty(),
+            attachments = state.attachments,
             onValueChange = { viewModel.updateTasks(it.takeIf { text -> text.isNotBlank() }) },
             isDragHovering = isDragHovering,
-            dropBoundsRef = dropBoundsRef
+            dropBoundsRef = dropBoundsRef,
+            onTokenClick = { attachment ->
+                val path = patientId?.let { pid ->
+                    storageRoot.resolve(pid)
+                        .resolve(attachment.sessionId)
+                        .resolve(attachment.storedName)
+                }
+                if (path != null && Files.exists(path)) {
+                    openAttachment(path)
+                }
+            }
         )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            FilledTonalIconButton(onClick = {
-                if (patientId == null || sessionId == null) return@FilledTonalIconButton
-                val files = chooseFiles() ?: return@FilledTonalIconButton
-                scope.launch(Dispatchers.IO) {
-                    val created = processAttachments(files, storageRoot, patientId, sessionId)
-                    created.forEach { attachment ->
-                        viewModel.registerAttachment(attachment)
-                        viewModel.appendAttachmentToken(attachment)
-                    }
-                }
-            }) {
-                Icon(Icons.Outlined.Add, contentDescription = "Agregar archivo")
-            }
-            Text("Agregar archivo", style = MaterialTheme.typography.labelLarge)
-            if (isDragHovering) {
-                Text(
-                    text = "Suelta los archivos para adjuntar",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.align(Alignment.CenterVertically)
-                )
-            }
-        }
-
-        if (state.attachments.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                state.attachments.forEach { attachment ->
-                    AttachmentRow(
-                        attachment = attachment,
-                        storageRoot = storageRoot,
-                        patientId = patientId,
-                        onOpen = { openAttachment(it) },
-                        onRemove = { filePath ->
-                            viewModel.removeAttachment(attachment.id)
-                            scope.launch(Dispatchers.IO) { Files.deleteIfExists(filePath) }
-                        }
-                    )
-                }
-            }
-        }
-
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AttachmentTasksField(
     value: String,
+    attachments: List<Attachment>,
     onValueChange: (String) -> Unit,
     isDragHovering: Boolean,
-    dropBoundsRef: AtomicReference<Rect?>
+    dropBoundsRef: AtomicReference<Rect?>,
+    onTokenClick: (Attachment) -> Unit
 ) {
     var fieldValue by remember { mutableStateOf(TextFieldValue(value)) }
+    var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    var innerTextOffset by remember { mutableStateOf(Offset.Zero) }
+    var innerTextSize by remember { mutableStateOf(Size.Zero) }
+    var containerPosition by remember { mutableStateOf(Offset.Zero) }
+    val interactionSource = remember { MutableInteractionSource() }
+
     LaunchedEffect(value) {
         if (value != fieldValue.text) {
             fieldValue = fieldValue.copy(text = value, selection = TextRange(value.length))
@@ -804,30 +827,83 @@ private fun AttachmentTasksField(
     )
     val tokenTransformation = remember(highlightStyle) { TokenHighlightTransformation(highlightStyle) }
     val borderColor = if (isDragHovering) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+    val colors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = borderColor,
+        unfocusedBorderColor = borderColor,
+        cursorColor = MaterialTheme.colorScheme.primary,
+        focusedLabelColor = MaterialTheme.colorScheme.primary
+    )
 
-    OutlinedTextField(
+    data class TokenSpan(val range: IntRange, val attachment: Attachment)
+
+    val tokenSpans = remember(fieldValue.text, attachments) {
+        "\\[([^\\]]+)]".toRegex().findAll(fieldValue.text).mapNotNull { match ->
+            val displayName = match.groupValues.getOrNull(1) ?: return@mapNotNull null
+            val attachment = attachments.firstOrNull { it.displayName == displayName }
+            if (attachment != null) TokenSpan(match.range, attachment) else null
+        }.toList()
+    }
+
+    BasicTextField(
         value = fieldValue,
         onValueChange = {
             fieldValue = it
             onValueChange(it.text)
         },
-        label = { Text("Descripción de tareas") },
-        placeholder = { Text("Describe las tareas y añade tags como [archivo.pdf]") },
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 160.dp)
             .onGloballyPositioned { coordinates ->
                 dropBoundsRef.set(coordinates.boundsInWindow())
+                containerPosition = coordinates.positionInRoot()
+            }
+            .pointerInput(tokenSpans, innerTextOffset, innerTextSize, textLayoutResult) {
+                if (tokenSpans.isEmpty()) return@pointerInput
+                awaitEachGesture {
+                    awaitFirstDown(pass = PointerEventPass.Initial)
+                    val up = waitForUpOrCancellation() ?: return@awaitEachGesture
+                    if (up.pressed) return@awaitEachGesture
+                    val layout = textLayoutResult ?: return@awaitEachGesture
+                    val size = innerTextSize
+                    if (size.width <= 0f || size.height <= 0f) return@awaitEachGesture
+                    val position = up.position - innerTextOffset
+                    val clamped = Offset(
+                        x = position.x.coerceIn(0f, size.width),
+                        y = position.y.coerceIn(0f, size.height)
+                    )
+                    val offset = layout.getOffsetForPosition(clamped)
+                    tokenSpans.firstOrNull { offset in it.range }?.let { onTokenClick(it.attachment) }
+                }
             },
-        textStyle = MaterialTheme.typography.bodyMedium,
+        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
         visualTransformation = tokenTransformation,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = borderColor,
-            unfocusedBorderColor = borderColor,
-            cursorColor = MaterialTheme.colorScheme.primary,
-            focusedLabelColor = MaterialTheme.colorScheme.primary
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        interactionSource = interactionSource,
+        maxLines = Int.MAX_VALUE,
+        onTextLayout = { textLayoutResult = it }
+    ) { innerTextField ->
+        OutlinedTextFieldDefaults.DecorationBox(
+            value = fieldValue.text,
+            visualTransformation = tokenTransformation,
+            innerTextField = {
+                Box(
+                    Modifier.onGloballyPositioned {
+                        innerTextOffset = it.positionInRoot() - containerPosition
+                        innerTextSize = it.size.toSize()
+                    }
+                ) {
+                    innerTextField()
+                }
+            },
+            placeholder = { Text("Describe las tareas y añade tags como [archivo.pdf]") },
+            label = { Text("Descripción de tareas") },
+            singleLine = false,
+            enabled = true,
+            isError = false,
+            interactionSource = interactionSource,
+            colors = colors
         )
-    )
+    }
 }
 
 private class TokenHighlightTransformation(
@@ -840,43 +916,6 @@ private class TokenHighlightTransformation(
             builder.addStyle(style, match.range.first, match.range.last + 1)
         }
         return TransformedText(builder.toAnnotatedString(), OffsetMapping.Identity)
-    }
-}
-
-@Composable
-private fun AttachmentRow(
-    attachment: Attachment,
-    storageRoot: Path,
-    patientId: String?,
-    onOpen: (Path) -> Unit,
-    onRemove: (Path) -> Unit
-) {
-    val path = remember(patientId, attachment) {
-        patientId?.let { pid ->
-            storageRoot.resolve(pid).resolve(attachment.sessionId).resolve(attachment.storedName)
-        }
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = attachment.displayName,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = { path?.let(onOpen) }, enabled = path != null) {
-                Text("Abrir")
-            }
-            TextButton(onClick = { path?.let(onRemove) }, enabled = path != null) {
-                Text("Eliminar")
-            }
-        }
     }
 }
 
@@ -996,12 +1035,8 @@ private fun DesktopDropTargetHandler(
 
             override fun drop(dtde: DropTargetDropEvent) {
                 val rect = boundsRef.get()
-                val inside = rect != null && rect.containsPoint(dtde.location)
+                rect?.containsPoint(dtde.location, tolerance = 64f)
                 scope.launch { onHoverChange(false) }
-                if (!inside) {
-                    dtde.rejectDrop()
-                    return
-                }
                 dtde.acceptDrop(DnDConstants.ACTION_COPY)
                 val files = extractFiles(dtde.transferable)
                 dtde.dropComplete(true)
@@ -1012,12 +1047,8 @@ private fun DesktopDropTargetHandler(
 
             private fun handleDrag(event: DropTargetDragEvent) {
                 val rect = boundsRef.get()
-                val inside = rect != null && rect.containsPoint(event.location)
-                if (inside) {
-                    event.acceptDrag(DnDConstants.ACTION_COPY)
-                } else {
-                    event.rejectDrag()
-                }
+                val inside = rect?.containsPoint(event.location, tolerance = 64f) ?: true
+                event.acceptDrag(DnDConstants.ACTION_COPY)
                 scope.launch { onHoverChange(inside) }
             }
         }
@@ -1032,8 +1063,14 @@ private fun DesktopDropTargetHandler(
     }
 }
 
-private fun Rect.containsPoint(point: Point): Boolean {
-    return point.x.toFloat() in left..right && point.y.toFloat() in top..bottom
+private fun Rect.containsPoint(point: Point, tolerance: Float = 0f): Boolean {
+    val leftBound = left - tolerance
+    val rightBound = right + tolerance
+    val topBound = top - tolerance
+    val bottomBound = bottom + tolerance
+    val x = point.x.toFloat()
+    val y = point.y.toFloat()
+    return x in leftBound..rightBound && y in topBound..bottomBound
 }
 
 private fun extractFiles(transferable: Transferable): List<File> {

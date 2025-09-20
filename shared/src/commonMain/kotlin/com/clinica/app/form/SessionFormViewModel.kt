@@ -365,7 +365,6 @@ class SessionFormViewModel(
         scope.launch(Dispatchers.Default) {
             runCatching {
                 sessionRepository.addAttachment(attachment)
-                appendAttachmentTokenInternal(attachment)
                 val list = sessionRepository.getAttachments(attachment.sessionId)
                 _state.update { it.copy(attachments = list) }
             }.onFailure { err ->
@@ -413,6 +412,8 @@ class SessionFormViewModel(
     private fun attachmentToken(attachment: Attachment): String = "[${attachment.displayName}]"
 
     private fun appendToken(current: String, token: String): String {
+        val tokenPattern = Regex("(?<=^|\\s)${Regex.escape(token)}(?=\\s|$)")
+        if (tokenPattern.containsMatchIn(current)) return current
         if (current.isBlank()) return token
         val needsSpace = !current.last().isWhitespace()
         return buildString {
