@@ -1,6 +1,5 @@
 package com.clinica.app.form
 
-import com.benasher44.uuid.uuid4
 import com.clinica.domain.model.Attachment
 import com.clinica.domain.model.BiosocialModel
 import com.clinica.domain.model.DysregulationAreas
@@ -40,30 +39,16 @@ class SessionFormViewModel(
     private var currentSessionId: String? = null
     private var tempIdSeed = -1L
 
-    fun loadDefaultPatient(patientName: String = "Paciente Demo") {
+    fun loadDefaultPatient() {
         scope.launch(Dispatchers.Default) {
             runCatching {
-                var patient = patientRepository.observeAll()
-                    .firstOrNull()
-                    ?.firstOrNull { it.displayName == patientName }
-                if (patient == null) {
-                    val now = Clock.System.now()
-                    patient = Patient(
-                        id = uuid4().toString(),
-                        displayName = patientName,
-                        firstName = null,
-                        lastName = null,
-                        dni = null,
-                        gender = null,
-                        birthDate = null,
-                        phone = null,
-                        address = null,
-                        createdAt = now,
-                        updatedAt = now
-                    )
-                    patientRepository.upsert(patient)
+                val patient = patientRepository.getAllPatients().firstOrNull()
+                if (patient != null) {
+                    ensureSession(patient.id)
+                } else {
+                    currentSessionId = null
+                    _state.value = SessionFormState(isLoading = false)
                 }
-                ensureSession(patient.id)
             }.onFailure { err ->
                 handleError(err)
             }

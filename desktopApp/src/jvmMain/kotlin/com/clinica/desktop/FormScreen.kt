@@ -1,9 +1,11 @@
-package com.clinica.desktop
+﻿package com.clinica.desktop
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +21,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -66,6 +71,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -116,6 +122,8 @@ import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.DEFAULT_BUFFER_SIZE
 import kotlinx.datetime.toLocalDateTime
+import kotlin.math.max
+import kotlin.math.roundToInt
 import androidx.compose.ui.unit.toSize
 
 @Composable
@@ -133,12 +141,16 @@ fun SessionFormScreen(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         )
     }
-    DisposableEffect(Unit) {
+
+    LaunchedEffect(selectedPatientId) {
         if (selectedPatientId != null) {
             viewModel.loadPatientById(selectedPatientId)
         } else {
             viewModel.loadDefaultPatient()
         }
+    }
+
+    DisposableEffect(Unit) {
         onDispose { viewModel.dispose() }
     }
 
@@ -195,6 +207,10 @@ fun SessionFormScreen(
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
+    if (state.patient == null || state.session == null) {
+        EmptySessionPlaceholder(modifier)
+        return
+    }
 
     Column(
         modifier = modifier
@@ -203,20 +219,20 @@ fun SessionFormScreen(
             .fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        SectionCard(title = "Identificación del paciente") {
+        SectionCard(title = "IdentificaciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n del paciente") {
             IdentificationSection(state, viewModel)
         }
 
-        SectionCard(title = "Datos familiares de interés") {
+        SectionCard(title = "Datos familiares de interÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©s") {
             ControlledLargeTextField(
-                label = "Descripción",
+                label = "DescripciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n",
                 value = state.familyNotes,
                 onValueChange = { viewModel.updateFamilyNotes(it) },
-                placeholder = "Historia familiar, vínculos, hitos relevantes"
+                placeholder = "Historia familiar, vÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â­nculos, hitos relevantes"
             )
         }
 
-        SectionCard(title = "Análisis en cadena de los problemas principales") {
+        SectionCard(title = "AnÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡lisis en cadena de los problemas principales") {
             ProblemChainSection(state, viewModel)
             Spacer(modifier = Modifier.height(12.dp))
             ControlledLargeTextField(
@@ -226,11 +242,11 @@ fun SessionFormScreen(
             )
         }
 
-        SectionCard(title = "Datos psicométricos (de corresponder)") {
+        SectionCard(title = "Datos psicomÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tricos (de corresponder)") {
             PsychometricsSection(state, viewModel)
         }
 
-        SectionCard(title = "Áreas de desregulación") {
+        SectionCard(title = "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âreas de desregulaciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n") {
             DysregulationSection(state, viewModel)
         }
 
@@ -242,16 +258,16 @@ fun SessionFormScreen(
             TreatmentObjectivesSection(state, viewModel)
         }
 
-        SectionCard(title = "Evolución de los objetivos") {
+        SectionCard(title = "EvoluciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n de los objetivos") {
             ProblemAnalysisSection(state, viewModel)
         }
 
-        SectionCard(title = "Apuntes de evolución psicoterapéutica") {
+        SectionCard(title = "Apuntes de evoluciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n psicoterapÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©utica") {
             EvolutionNotesSection(state, viewModel)
         }
 
         SectionCard(
-            title = "Tareas / Adjuntos de la sesión",
+            title = "Tareas / Adjuntos de la sesiÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n",
             actions = {
                 IconButton(
                     onClick = {
@@ -281,7 +297,7 @@ fun SessionFormScreen(
             )
         }
 
-        // Botón de guardar al final
+        // BotÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n de guardar al final
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             modifier = Modifier
@@ -304,7 +320,7 @@ fun SessionFormScreen(
                             isSaving = true
                             saveSuccess = false
                             viewModel.saveSession()
-                            // Pequeña espera para asegurar que se guarde
+                            // PequeÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±a espera para asegurar que se guarde
                             kotlinx.coroutines.delay(500)
                             isSaving = false
                             saveSuccess = true
@@ -321,7 +337,7 @@ fun SessionFormScreen(
                         Spacer(Modifier.width(8.dp))
                         Text("Guardando...")
                     } else {
-                        Text(if (saveSuccess) "✓ Guardado" else "Guardar Ficha")
+                        Text(if (saveSuccess) "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ Guardado" else "Guardar Ficha")
                     }
                 }
             }
@@ -330,109 +346,152 @@ fun SessionFormScreen(
 }
 
 @Composable
+private fun EmptySessionPlaceholder(modifier: Modifier) {
+    Box(
+        modifier = modifier.fillMaxWidth().padding(32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Selecciona un paciente para cargar la ficha",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                text = "Crea un paciente desde la gestiÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n o elige uno existente para comenzar a completar la ficha.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+@Composable
 private fun SectionCard(
     title: String,
     actions: (@Composable RowScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 32.dp)
+            .padding(horizontal = 24.dp)
+            .border(1.dp, Color.Black)
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF424242))
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = if (actions == null) Arrangement.Center else Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title.uppercase(),
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+            )
+            if (actions != null) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    content = actions
+                )
+            }
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .background(Color.White)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = if (actions == null) Arrangement.Start else Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-                )
-                if (actions != null) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        content = actions
-                    )
-                }
-            }
             content()
         }
     }
 }
-
 @Composable
 private fun IdentificationSection(state: SessionFormState, viewModel: SessionFormViewModel) {
     val patient = state.patient
     val session = state.session
 
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        OutlinedTextField(
-            value = patient?.displayName.orEmpty(),
-            onValueChange = { viewModel.updatePatientName(it) },
-            label = { Text("Apellidos y nombres") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
-            DatePickerField(
-                label = "Fecha de nacimiento",
-                value = patient?.birthDate,
-                onValueChange = { viewModel.updateBirthDate(it) },
-                modifier = Modifier.weight(1f)
+    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(0.dp)
+        ) {
+            FormTextField(
+                label = "Apellidos y Nombres",
+                value = patient?.displayName.orEmpty(),
+                onValueChange = { viewModel.updatePatientName(it) },
+                modifier = Modifier.weight(2f)
             )
-            AgeDisplay(modifier = Modifier.weight(1f), birthDate = patient?.birthDate)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
-            DatePickerField(
-                label = "Fecha de primera atención",
+            FormDateField(
+                label = "Fecha de Primera AtenciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n",
                 value = session?.firstAttentionDate,
                 onValueChange = { viewModel.updateFirstAttentionDate(it) },
                 modifier = Modifier.weight(1f)
             )
-            OutlinedTextField(
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(0.dp)
+        ) {
+            FormDateField(
+                label = "Fecha de Nacimiento",
+                value = patient?.birthDate,
+                onValueChange = { viewModel.updateBirthDate(it) },
+                modifier = Modifier.weight(1f)
+            )
+            FormReadOnlyField(
+                label = "Edad",
+                value = patient?.birthDate?.let { "${calculateAge(it)} aÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â±os" } ?: "",
+                modifier = Modifier.weight(0.7f)
+            )
+            FormTextField(
+                label = "GÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nero",
                 value = patient?.gender.orEmpty(),
                 onValueChange = { viewModel.updateGender(it) },
-                label = { Text("Género") },
                 modifier = Modifier.weight(1f)
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
-            OutlinedTextField(
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(0.dp)
+        ) {
+            FormTextField(
+                label = "DirecciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n actual",
                 value = patient?.address.orEmpty(),
                 onValueChange = { viewModel.updateDireccion(it) },
-                label = { Text("Dirección actual") },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(2f)
             )
-            OutlinedTextField(
+            FormTextField(
+                label = "NÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° DNI",
                 value = patient?.dni.orEmpty(),
                 onValueChange = { viewModel.updateDni(it) },
-                label = { Text("Nº DNI") },
                 modifier = Modifier.weight(1f)
             )
-            OutlinedTextField(
+            FormTextField(
+                label = "NÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° Celular",
                 value = patient?.phone.orEmpty(),
                 onValueChange = { viewModel.updatePhone(it) },
-                label = { Text("Nº Celular") },
                 modifier = Modifier.weight(1f)
             )
         }
-        ControlledLargeTextField(
+        FormTextField(
             label = "Motivo de consulta principal",
             value = session?.motivoPrincipal.orEmpty(),
-            onValueChange = { viewModel.updateMotivoPrincipal(it) }
+            onValueChange = { viewModel.updateMotivoPrincipal(it) },
+            minLines = 3
         )
-        ControlledLargeTextField(
+        FormTextField(
             label = "Otros motivos a tratar",
             value = session?.otrosMotivos.orEmpty(),
-            onValueChange = { viewModel.updateOtrosMotivos(it) }
+            onValueChange = { viewModel.updateOtrosMotivos(it) },
+            minLines = 3
         )
     }
 }
@@ -440,108 +499,161 @@ private fun IdentificationSection(state: SessionFormState, viewModel: SessionFor
 @Composable
 private fun ProblemChainSection(state: SessionFormState, viewModel: SessionFormViewModel) {
     val chains = state.problemChains
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    val headers = listOf(
+        "Vulnerabilidades",
+        "Evento desencadenante",
+        "Eslabones",
+        "Problemas de conducta o crisis",
+        "Consecuentes"
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, Color.Black),
+            horizontalArrangement = Arrangement.spacedBy(0.dp)
+        ) {
+            TableHeaderCell(text = "", modifier = Modifier.weight(0.35f))
+            headers.forEach { header ->
+                TableHeaderCell(text = header, modifier = Modifier.weight(1f))
+            }
+        }
         chains.forEach { entry ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, Color.Black),
+                horizontalArrangement = Arrangement.spacedBy(0.dp)
+            ) {
+                FormCell(
+                    label = "",
+                    modifier = Modifier.weight(0.35f),
+                    backgroundColor = Color(0xFFF5F5F5)
+                ) {
                     Text(
                         text = entry.label,
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium)
-                    )
-                    ControlledLargeTextField(
-                        label = "Vulnerabilidades",
-                        value = entry.vulnerabilidades.orEmpty(),
-                        onValueChange = { value ->
-                            viewModel.updateProblemChain(entry.label) { it.copy(vulnerabilidades = value) }
-                        }
-                    )
-                    ControlledLargeTextField(
-                        label = "Evento desencadenante",
-                        value = entry.eventoDesencadenante.orEmpty(),
-                        onValueChange = { value ->
-                            viewModel.updateProblemChain(entry.label) { it.copy(eventoDesencadenante = value) }
-                        }
-                    )
-                    ControlledLargeTextField(
-                        label = "Eslabones",
-                        value = entry.eslabones.orEmpty(),
-                        onValueChange = { value ->
-                            viewModel.updateProblemChain(entry.label) { it.copy(eslabones = value) }
-                        }
-                    )
-                    ControlledLargeTextField(
-                        label = "Problemas de conducta o crisis",
-                        value = entry.problemasConducta.orEmpty(),
-                        onValueChange = { value ->
-                            viewModel.updateProblemChain(entry.label) { it.copy(problemasConducta = value) }
-                        }
-                    )
-                    ControlledLargeTextField(
-                        label = "Consecuentes",
-                        value = entry.consecuentes.orEmpty(),
-                        onValueChange = { value ->
-                            viewModel.updateProblemChain(entry.label) { it.copy(consecuentes = value) }
-                        }
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
                     )
                 }
+                FormTextField(
+                    label = "",
+                    value = entry.vulnerabilidades.orEmpty(),
+                    onValueChange = { value ->
+                        viewModel.updateProblemChain(entry.label) { it.copy(vulnerabilidades = value) }
+                    },
+                    minLines = 3,
+                    modifier = Modifier.weight(1f)
+                )
+                FormTextField(
+                    label = "",
+                    value = entry.eventoDesencadenante.orEmpty(),
+                    onValueChange = { value ->
+                        viewModel.updateProblemChain(entry.label) { it.copy(eventoDesencadenante = value) }
+                    },
+                    minLines = 3,
+                    modifier = Modifier.weight(1f)
+                )
+                FormTextField(
+                    label = "",
+                    value = entry.eslabones.orEmpty(),
+                    onValueChange = { value ->
+                        viewModel.updateProblemChain(entry.label) { it.copy(eslabones = value) }
+                    },
+                    minLines = 3,
+                    modifier = Modifier.weight(1f)
+                )
+                FormTextField(
+                    label = "",
+                    value = entry.problemasConducta.orEmpty(),
+                    onValueChange = { value ->
+                        viewModel.updateProblemChain(entry.label) { it.copy(problemasConducta = value) }
+                    },
+                    minLines = 3,
+                    modifier = Modifier.weight(1f)
+                )
+                FormTextField(
+                    label = "",
+                    value = entry.consecuentes.orEmpty(),
+                    onValueChange = { value ->
+                        viewModel.updateProblemChain(entry.label) { it.copy(consecuentes = value) }
+                    },
+                    minLines = 3,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
+
+    Spacer(modifier = Modifier.height(12.dp))
+    FormTextField(
+        label = "Lista de metas asociadas a los problemas principales",
+        value = state.problemGoals?.metas.orEmpty(),
+        onValueChange = { viewModel.updateProblemGoals(it) },
+        minLines = 3
+    )
 }
 
 @Composable
 private fun PsychometricsSection(state: SessionFormState, viewModel: SessionFormViewModel) {
     val data = state.psychometrics ?: defaultPsychometricsStub(state.session?.id)
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
-            ControlledLargeTextField(
-                label = "Cociente intelectual - dato cuantitativo",
+    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(0.dp)
+        ) {
+            FormTextField(
+                label = "Cociente intelectual",
                 value = data.coeficienteValor.orEmpty(),
-                onValueChange = { value ->
-                    viewModel.updatePsychometrics { it.copy(coeficienteValor = value) }
-                },
+                onValueChange = { value -> viewModel.updatePsychometrics { it.copy(coeficienteValor = value) } },
                 modifier = Modifier.weight(1f),
-                minHeight = 80.dp
+                minLines = 2
             )
-            ControlledLargeTextField(
-                label = "Cociente intelectual - clasificación",
+            FormTextField(
+                label = "ClasificaciÃ³n",
                 value = data.coeficienteClasificacion.orEmpty(),
-                onValueChange = { value ->
-                    viewModel.updatePsychometrics { it.copy(coeficienteClasificacion = value) }
-                },
+                onValueChange = { value -> viewModel.updatePsychometrics { it.copy(coeficienteClasificacion = value) } },
                 modifier = Modifier.weight(1f),
-                minHeight = 80.dp
+                minLines = 2
             )
         }
-        ControlledLargeTextField(
+        FormTextField(
             label = "Temperamento",
             value = data.temperamento.orEmpty(),
-            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(temperamento = value) } }
+            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(temperamento = value) } },
+            minLines = 2
         )
-        ControlledLargeTextField(
+        FormTextField(
             label = "Personalidad y rasgos importantes",
             value = data.personalidad.orEmpty(),
-            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(personalidad = value) } }
+            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(personalidad = value) } },
+            minLines = 2
         )
-        ControlledLargeTextField(
-            label = "Atención y concentración",
+        FormTextField(
+            label = "AtenciÃ³n y concentraciÃ³n",
             value = data.atencion.orEmpty(),
-            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(atencion = value) } }
+            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(atencion = value) } },
+            minLines = 2
         )
-        ControlledLargeTextField(
+        FormTextField(
             label = "Problemas de conducta",
             value = data.problemasConducta.orEmpty(),
-            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(problemasConducta = value) } }
+            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(problemasConducta = value) } },
+            minLines = 2
         )
-        ControlledLargeTextField(
-            label = "Dinámica familiar",
+        FormTextField(
+            label = "DinÃ¡mica familiar",
             value = data.dinamicaFamiliar.orEmpty(),
-            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(dinamicaFamiliar = value) } }
+            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(dinamicaFamiliar = value) } },
+            minLines = 2
         )
-        ControlledLargeTextField(
-            label = "Otros de interés",
+        FormTextField(
+            label = "Otros de interÃ©s",
             value = data.otrosInteres.orEmpty(),
-            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(otrosInteres = value) } }
+            onValueChange = { value -> viewModel.updatePsychometrics { it.copy(otrosInteres = value) } },
+            minLines = 2
         )
     }
 }
@@ -549,43 +661,62 @@ private fun PsychometricsSection(state: SessionFormState, viewModel: SessionForm
 @Composable
 private fun DysregulationSection(state: SessionFormState, viewModel: SessionFormViewModel) {
     val data = state.dysregulation ?: defaultDysregulationStub(state.session?.id)
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        ControlledLargeTextField(
+    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        FormTextField(
             label = "Emocional",
             value = data.emocional.orEmpty(),
-            onValueChange = { value -> viewModel.updateDysregulation { it.copy(emocional = value) } }
+            onValueChange = { value -> viewModel.updateDysregulation { it.copy(emocional = value) } },
+            minLines = 2
         )
-        ControlledLargeTextField(
+        FormTextField(
             label = "Conductual",
             value = data.conductual.orEmpty(),
-            onValueChange = { value -> viewModel.updateDysregulation { it.copy(conductual = value) } }
+            onValueChange = { value -> viewModel.updateDysregulation { it.copy(conductual = value) } },
+            minLines = 2
         )
-        ControlledLargeTextField(
+        FormTextField(
             label = "Interpersonal",
             value = data.interpersonal.orEmpty(),
-            onValueChange = { value -> viewModel.updateDysregulation { it.copy(interpersonal = value) } }
+            onValueChange = { value -> viewModel.updateDysregulation { it.copy(interpersonal = value) } },
+            minLines = 2
         )
-        ControlledLargeTextField(
+        FormTextField(
             label = "Del self - valores",
             value = data.selfValores.orEmpty(),
-            onValueChange = { value -> viewModel.updateDysregulation { it.copy(selfValores = value) } }
+            onValueChange = { value -> viewModel.updateDysregulation { it.copy(selfValores = value) } },
+            minLines = 2
         )
-        ControlledLargeTextField(
+        FormTextField(
             label = "Cognitiva",
             value = data.cognitiva.orEmpty(),
-            onValueChange = { value -> viewModel.updateDysregulation { it.copy(cognitiva = value) } }
+            onValueChange = { value -> viewModel.updateDysregulation { it.copy(cognitiva = value) } },
+            minLines = 2
         )
-        ControlledLargeTextField(
+        FormTextField(
             label = "Resumen",
             value = data.resumen.orEmpty(),
-            onValueChange = { value -> viewModel.updateDysregulation { it.copy(resumen = value) } }
+            onValueChange = { value -> viewModel.updateDysregulation { it.copy(resumen = value) } },
+            minLines = 2
         )
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Aplicación de BsL-23 (siempre y cuando se sospeche de TLP)")
-            Switch(
-                checked = data.bsl23Aplicado,
-                onCheckedChange = { checked -> viewModel.updateDysregulation { it.copy(bsl23Aplicado = checked) } }
-            )
+        FormCell(
+            label = "AplicaciÃ³n de BsL-23 (siempre y cuando se sospeche de TLP)",
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color.White
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = if (data.bsl23Aplicado) "Aplicado" else "No aplicado",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Switch(
+                    checked = data.bsl23Aplicado,
+                    onCheckedChange = { checked -> viewModel.updateDysregulation { it.copy(bsl23Aplicado = checked) } }
+                )
+            }
         }
     }
 }
@@ -593,41 +724,48 @@ private fun DysregulationSection(state: SessionFormState, viewModel: SessionForm
 @Composable
 private fun BiosocialSection(state: SessionFormState, viewModel: SessionFormViewModel) {
     val data = state.biosocial ?: defaultBiosocialStub(state.session?.id)
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        ControlledLargeTextField(
+    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        FormTextField(
             label = "Vulnerabilidad emocional",
             value = data.vulnerabilidadEmocional.orEmpty(),
-            onValueChange = { value -> viewModel.updateBiosocial { it.copy(vulnerabilidadEmocional = value) } }
+            onValueChange = { value -> viewModel.updateBiosocial { it.copy(vulnerabilidadEmocional = value) } },
+            minLines = 2
         )
-        ControlledLargeTextField(
+        FormTextField(
             label = "Sensibilidad",
             value = data.sensibilidad.orEmpty(),
-            onValueChange = { value -> viewModel.updateBiosocial { it.copy(sensibilidad = value) } }
+            onValueChange = { value -> viewModel.updateBiosocial { it.copy(sensibilidad = value) } },
+            minLines = 2
         )
-        ControlledLargeTextField(
+        FormTextField(
             label = "Intensidad",
             value = data.intensidad.orEmpty(),
-            onValueChange = { value -> viewModel.updateBiosocial { it.copy(intensidad = value) } }
+            onValueChange = { value -> viewModel.updateBiosocial { it.copy(intensidad = value) } },
+            minLines = 2
         )
-        ControlledLargeTextField(
+        FormTextField(
             label = "Lento retorno a la calma",
             value = data.lentoRetornoCalma.orEmpty(),
-            onValueChange = { value -> viewModel.updateBiosocial { it.copy(lentoRetornoCalma = value) } }
+            onValueChange = { value -> viewModel.updateBiosocial { it.copy(lentoRetornoCalma = value) } },
+            minLines = 2
         )
-        ControlledLargeTextField(
-            label = "Invalidación ambiental",
+        FormTextField(
+            label = "InvalidaciÃ³n ambiental",
             value = data.invalidacionAmbiental.orEmpty(),
-            onValueChange = { value -> viewModel.updateBiosocial { it.copy(invalidacionAmbiental = value) } }
+            onValueChange = { value -> viewModel.updateBiosocial { it.copy(invalidacionAmbiental = value) } },
+            minLines = 2
         )
-        ControlledLargeTextField(
+        FormTextField(
             label = "Criticar emociones",
             value = data.criticarEmociones.orEmpty(),
-            onValueChange = { value -> viewModel.updateBiosocial { it.copy(criticarEmociones = value) } }
+            onValueChange = { value -> viewModel.updateBiosocial { it.copy(criticarEmociones = value) } },
+            minLines = 2
         )
-        ControlledLargeTextField(
+        FormTextField(
             label = "Otros",
             value = data.otros.orEmpty(),
-            onValueChange = { value -> viewModel.updateBiosocial { it.copy(otros = value) } }
+            onValueChange = { value -> viewModel.updateBiosocial { it.copy(otros = value) } },
+            minLines = 2
         )
     }
 }
@@ -636,24 +774,37 @@ private fun BiosocialSection(state: SessionFormState, viewModel: SessionFormView
 private fun TreatmentObjectivesSection(state: SessionFormState, viewModel: SessionFormViewModel) {
     val objectives = state.treatmentObjectives
     val grouped = SessionFormMetadata.treatmentFields.groupBy { it.stage }
-    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        grouped.forEach { (stage, definitions) ->
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = stageLabel(stage),
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium)
-                )
+    val stageEntries = grouped.entries.toList()
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        stageEntries.forEachIndexed { index, (stage, definitions) ->
+            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, Color.Black)
+                        .background(Color(0xFF4A4A4A))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = stageLabel(stage).uppercase(),
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    )
+                }
                 definitions.forEach { definition ->
                     val value = objectives.firstOrNull { it.stage == stage && it.field == definition.field }?.value.orEmpty()
-                    ControlledLargeTextField(
+                    FormTextField(
                         label = definition.label,
                         value = value,
-                        onValueChange = { text -> viewModel.updateTreatmentObjective(stage, definition.field, text) }
+                        onValueChange = { text -> viewModel.updateTreatmentObjective(stage, definition.field, text) },
+                        minLines = 2
                     )
                 }
             }
-            if (stage != grouped.keys.last()) {
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            if (index != stageEntries.lastIndex) {
+                Spacer(modifier = Modifier.height(12.dp))
             }
         }
     }
@@ -664,102 +815,127 @@ private fun ProblemAnalysisSection(state: SessionFormState, viewModel: SessionFo
     val analyses = state.problemAnalyses.sortedBy { it.problemNumber }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         analyses.forEach { analysis ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, Color.Black)
+                        .background(Color(0xFF4A4A4A))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
                     Text(
                         text = "Comportamiento problema ${analysis.problemNumber} (DFI)",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium)
-                    )
-                    ControlledLargeTextField(
-                        label = "Descripción",
-                        value = analysis.comportamiento.orEmpty(),
-                        onValueChange = { value ->
-                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(comportamiento = value) }
-                        }
-                    )
-                    ControlledLargeTextField(
-                        label = "Análisis de la solución",
-                        value = analysis.analisisSolucion.orEmpty(),
-                        onValueChange = { value ->
-                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(analisisSolucion = value) }
-                        }
-                    )
-                    ControlledLargeTextField(
-                        label = "Vulnerabilidad",
-                        value = analysis.vulnerabilidad.orEmpty(),
-                        onValueChange = { value ->
-                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(vulnerabilidad = value) }
-                        }
-                    )
-                    ControlledLargeTextField(
-                        label = "Evento precipitante externo",
-                        value = analysis.eventoExterno.orEmpty(),
-                        onValueChange = { value ->
-                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(eventoExterno = value) }
-                        }
-                    )
-                    ControlledLargeTextField(
-                        label = "Pensamientos",
-                        value = analysis.pensamientos.orEmpty(),
-                        onValueChange = { value ->
-                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(pensamientos = value) }
-                        }
-                    )
-                    ControlledLargeTextField(
-                        label = "Sensaciones",
-                        value = analysis.sensaciones.orEmpty(),
-                        onValueChange = { value ->
-                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(sensaciones = value) }
-                        }
-                    )
-                    ControlledLargeTextField(
-                        label = "Impulsos",
-                        value = analysis.impulsos.orEmpty(),
-                        onValueChange = { value ->
-                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(impulsos = value) }
-                        }
-                    )
-                    ControlledLargeTextField(
-                        label = "Emociones",
-                        value = analysis.emociones.orEmpty(),
-                        onValueChange = { value ->
-                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(emociones = value) }
-                        }
-                    )
-                    ControlledLargeTextField(
-                        label = "Consecuencias inmediatas reforzantes",
-                        value = analysis.consecuenciasInmediatas.orEmpty(),
-                        onValueChange = { value ->
-                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(consecuenciasInmediatas = value) }
-                        }
-                    )
-                    ControlledLargeTextField(
-                        label = "Consecuencias demoradas",
-                        value = analysis.consecuenciasDemoradas.orEmpty(),
-                        onValueChange = { value ->
-                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(consecuenciasDemoradas = value) }
-                        }
-                    )
-                    ControlledLargeTextField(
-                        label = "Resuma el plan de crisis",
-                        value = analysis.planCrisis.orEmpty(),
-                        onValueChange = { value ->
-                            viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(planCrisis = value) }
-                        }
-                    )
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        TextButton(onClick = { viewModel.removeProblemAnalysis(analysis.problemNumber) }) {
-                            Icon(Icons.Outlined.Delete, contentDescription = null)
-                            Spacer(Modifier.width(4.dp))
-                            Text("Eliminar problema")
-                        }
-                        Text(
-                            text = "#${analysis.problemNumber}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.align(Alignment.CenterVertically)
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
                         )
+                    )
+                }
+                FormTextField(
+                    label = "DescripciÃ³n",
+                    value = analysis.comportamiento.orEmpty(),
+                    onValueChange = { value ->
+                        viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(comportamiento = value) }
+                    },
+                    minLines = 2
+                )
+                FormTextField(
+                    label = "AnÃ¡lisis de la soluciÃ³n",
+                    value = analysis.analisisSolucion.orEmpty(),
+                    onValueChange = { value ->
+                        viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(analisisSolucion = value) }
+                    },
+                    minLines = 2
+                )
+                FormTextField(
+                    label = "Vulnerabilidad",
+                    value = analysis.vulnerabilidad.orEmpty(),
+                    onValueChange = { value ->
+                        viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(vulnerabilidad = value) }
+                    },
+                    minLines = 2
+                )
+                FormTextField(
+                    label = "Evento precipitante externo",
+                    value = analysis.eventoExterno.orEmpty(),
+                    onValueChange = { value ->
+                        viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(eventoExterno = value) }
+                    },
+                    minLines = 2
+                )
+                FormTextField(
+                    label = "Pensamientos",
+                    value = analysis.pensamientos.orEmpty(),
+                    onValueChange = { value ->
+                        viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(pensamientos = value) }
+                    },
+                    minLines = 2
+                )
+                FormTextField(
+                    label = "Sensaciones",
+                    value = analysis.sensaciones.orEmpty(),
+                    onValueChange = { value ->
+                        viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(sensaciones = value) }
+                    },
+                    minLines = 2
+                )
+                FormTextField(
+                    label = "Impulsos",
+                    value = analysis.impulsos.orEmpty(),
+                    onValueChange = { value ->
+                        viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(impulsos = value) }
+                    },
+                    minLines = 2
+                )
+                FormTextField(
+                    label = "Emociones",
+                    value = analysis.emociones.orEmpty(),
+                    onValueChange = { value ->
+                        viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(emociones = value) }
+                    },
+                    minLines = 2
+                )
+                FormTextField(
+                    label = "Consecuencias inmediatas reforzantes",
+                    value = analysis.consecuenciasInmediatas.orEmpty(),
+                    onValueChange = { value ->
+                        viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(consecuenciasInmediatas = value) }
+                    },
+                    minLines = 2
+                )
+                FormTextField(
+                    label = "Consecuencias demoradas",
+                    value = analysis.consecuenciasDemoradas.orEmpty(),
+                    onValueChange = { value ->
+                        viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(consecuenciasDemoradas = value) }
+                    },
+                    minLines = 2
+                )
+                FormTextField(
+                    label = "Resuma el plan de crisis",
+                    value = analysis.planCrisis.orEmpty(),
+                    onValueChange = { value ->
+                        viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(planCrisis = value) }
+                    },
+                    minLines = 2
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = { viewModel.removeProblemAnalysis(analysis.problemNumber) }) {
+                        Icon(Icons.Outlined.Delete, contentDescription = null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Eliminar problema")
                     }
+                    Text(
+                        text = "#${analysis.problemNumber}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -774,38 +950,52 @@ private fun EvolutionNotesSection(state: SessionFormState, viewModel: SessionFor
     val notes = state.evolutionNotes
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         notes.forEach { note ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = note.titulo,
-                            onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(titulo = value) } },
-                            label = { Text("Sesión") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        OutlinedTextField(
-                            value = note.notaFecha.orEmpty(),
-                            onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(notaFecha = value) } },
-                            label = { Text("Fecha") },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    ControlledLargeTextField(
+            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    FormTextField(
+                        label = "SesiÃ³n",
+                        value = note.titulo,
+                        onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(titulo = value) } },
+                        modifier = Modifier.weight(1f),
+                        minLines = 1,
+                        labelColor = Color(0xFFD32F2F)
+                    )
+                    FormTextField(
+                        label = "Fecha",
+                        value = note.notaFecha.orEmpty(),
+                        onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(notaFecha = value) } },
+                        modifier = Modifier.weight(1f),
+                        minLines = 1
+                    )
+                    FormTextField(
                         label = "Comportamiento problema trabajado",
                         value = note.comportamientoTrabajado.orEmpty(),
-                        onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(comportamientoTrabajado = value) } }
+                        onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(comportamientoTrabajado = value) } },
+                        modifier = Modifier.weight(1.5f),
+                        minLines = 1
                     )
-                    ControlledLargeTextField(
-                        label = "Apuntes",
-                        value = note.apuntes.orEmpty(),
-                        onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(apuntes = value) } }
-                    )
-                    ControlledLargeTextField(
-                        label = "Tareas",
-                        value = note.tareas.orEmpty(),
-                        onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(tareas = value) } }
-                    )
+                }
+                FormTextField(
+                    label = "Apuntes",
+                    value = note.apuntes.orEmpty(),
+                    onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(apuntes = value) } },
+                    minLines = 3
+                )
+                FormTextField(
+                    label = "Tareas",
+                    value = note.tareas.orEmpty(),
+                    onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(tareas = value) } },
+                    minLines = 3
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
                     TextButton(onClick = { viewModel.removeEvolutionNote(note.id) }) {
                         Icon(Icons.Outlined.Delete, contentDescription = null)
                         Spacer(Modifier.width(4.dp))
@@ -815,7 +1005,7 @@ private fun EvolutionNotesSection(state: SessionFormState, viewModel: SessionFor
             }
         }
         Button(onClick = { viewModel.addEvolutionNote() }) {
-            Text("Agregar sesión")
+            Text("Agregar sesiÃ³n")
         }
     }
 }
@@ -948,8 +1138,8 @@ private fun AttachmentTasksField(
                     innerTextField()
                 }
             },
-            placeholder = { Text("Describe las tareas y añade tags como [archivo.pdf]") },
-            label = { Text("Descripción de tareas") },
+            placeholder = { Text("Describe las tareas y aÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±ade tags como [archivo.pdf]") },
+            label = { Text("DescripciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n de tareas") },
             singleLine = false,
             enabled = true,
             isError = false,
@@ -973,6 +1163,275 @@ private class TokenHighlightTransformation(
 }
 
 @Composable
+@Composable
+    modifier: Modifier = Modifier,
+    labelColor: Color = MaterialTheme.colorScheme.onSurface,
+    backgroundColor: Color = Color.White,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = modifier
+            .border(1.dp, Color.Black)
+            .background(backgroundColor)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        if (label.isNotBlank()) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = labelColor
+            )
+        }
+        content()
+    }
+}
+    label: String,
+    modifier: Modifier = Modifier,
+    labelColor: Color = MaterialTheme.colorScheme.onSurface,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = modifier
+            .border(1.dp, Color.Black)
+            .background(Color.White)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = labelColor
+        )
+        content()
+    }
+}
+
+@Composable
+private fun FormTextField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    minLines: Int = 1,
+    labelColor: Color = MaterialTheme.colorScheme.onSurface,
+    placeholder: String? = null,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default
+) {
+    FormCell(label = label, modifier = modifier, labelColor = labelColor) {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            textStyle = MaterialTheme.typography.bodyMedium,
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            keyboardOptions = keyboardOptions,
+            minLines = minLines,
+            maxLines = if (minLines == 1) 1 else Int.MAX_VALUE,
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = (minLines * 24).dp),
+            decorationBox = { inner ->
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    if (value.isEmpty() && !placeholder.isNullOrBlank()) {
+                        Text(
+                            text = placeholder,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    inner()
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun FormReadOnlyField(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    labelColor: Color = MaterialTheme.colorScheme.onSurface,
+    emptyPlaceholder: String = "-"
+) {
+    val display = value.ifBlank { emptyPlaceholder }
+    val displayColor = if (value.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+    FormCell(label = label, modifier = modifier, labelColor = labelColor) {
+        Text(
+            text = display,
+            style = MaterialTheme.typography.bodyMedium,
+            color = displayColor
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FormDateField(
+    label: String,
+    value: LocalDate?,
+    onValueChange: (LocalDate?) -> Unit,
+    modifier: Modifier = Modifier,
+    labelColor: Color = MaterialTheme.colorScheme.onSurface
+) {
+    var showDialog by rememberSaveable { mutableStateOf(false) }
+    val formatted = value?.let { formatDate(it) }.orEmpty()
+
+    FormCell(label = label, modifier = modifier, labelColor = labelColor) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showDialog = true }
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (formatted.isEmpty()) "Seleccionar fecha" else formatted,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (formatted.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = Icons.Outlined.DateRange,
+                contentDescription = "Seleccionar fecha",
+                tint = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+
+    if (showDialog) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = value?.toEpochMillis())
+        DatePickerDialog(
+            onDismissRequest = { showDialog = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val selected = datePickerState.selectedDateMillis?.let { millis ->
+                            Instant.fromEpochMilliseconds(millis).toLocalDateTime(TimeZone.currentSystemDefault()).date
+                        }
+                        onValueChange(selected)
+                        showDialog = false
+                    }
+                ) {
+                    Text("Aceptar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState, showModeToggle = false)
+        }
+    }
+}
+
+@Composable
+private fun RowScope.TableHeaderCell(
+    text: String,
+    modifier: Modifier = Modifier,
+    backgroundColor: Color = Color(0xFF4A4A4A)
+) {
+    Box(
+        modifier = modifier
+            .border(1.dp, Color.Black)
+            .background(backgroundColor)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White
+            ),
+            textAlign = TextAlign.Center
+        )
+    }
+}
+    label: String,
+
+@Composable
+private fun RowScope.TableHeaderCell(
+    text: String,
+    modifier: Modifier = Modifier,
+    backgroundColor: Color = Color(0xFF4A4A4A)
+) {
+    Box(
+        modifier = modifier
+            .border(1.dp, Color.Black)
+            .background(backgroundColor)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White
+            ),
+            textAlign = TextAlign.Center
+        )
+    }
+}
+    value: LocalDate?,
+    onValueChange: (LocalDate?) -> Unit,
+    modifier: Modifier = Modifier,
+    labelColor: Color = MaterialTheme.colorScheme.onSurface
+) {
+    var showDialog by rememberSaveable { mutableStateOf(false) }
+    val formatted = value?.let { formatDate(it) }.orEmpty()
+
+    FormCell(label = label, modifier = modifier, labelColor = labelColor) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showDialog = true }
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (formatted.isEmpty()) "Seleccionar fecha" else formatted,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (formatted.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = Icons.Outlined.DateRange,
+                contentDescription = "Seleccionar fecha",
+                tint = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+
+    if (showDialog) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = value?.toEpochMillis())
+        DatePickerDialog(
+            onDismissRequest = { showDialog = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val selected = datePickerState.selectedDateMillis?.let { millis ->
+                            Instant.fromEpochMilliseconds(millis).toLocalDateTime(TimeZone.currentSystemDefault()).date
+                        }
+                        onValueChange(selected)
+                        showDialog = false
+                    }
+                ) {
+                    Text("Aceptar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState, showModeToggle = false)
+        }
+    }
 private fun ControlledLargeTextField(
     label: String,
     value: String,
@@ -981,6 +1440,16 @@ private fun ControlledLargeTextField(
     placeholder: String? = null,
     minHeight: Dp = 120.dp
 ) {
+    val estimatedLines = max((minHeight.value / 24f).roundToInt(), 3)
+    FormTextField(
+        label = label,
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier,
+        minLines = estimatedLines,
+        placeholder = placeholder
+    )
+}
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -995,8 +1464,6 @@ private fun ControlledLargeTextField(
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DatePickerField(
     label: String,
     value: LocalDate?,
     onValueChange: (LocalDate?) -> Unit,
@@ -1057,7 +1524,7 @@ private fun AgeDisplay(modifier: Modifier, birthDate: LocalDate?) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(8.dp))
-        val ageText = birthDate?.let { "${calculateAge(it)} años" } ?: "—"
+        val ageText = birthDate?.let { "${calculateAge(it)} aÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±os" } ?: "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"
         Text(
             text = ageText,
             style = MaterialTheme.typography.titleMedium,
