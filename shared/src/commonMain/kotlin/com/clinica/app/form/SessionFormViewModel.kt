@@ -29,8 +29,8 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 
 class SessionFormViewModel(
-    private val patientRepository: PatientRepository,
-    private val sessionRepository: SessionRepository,
+    val patientRepository: PatientRepository,
+    val sessionRepository: SessionRepository,
     private val scope: CoroutineScope
 ) {
 
@@ -144,6 +144,53 @@ class SessionFormViewModel(
         scope.launch(Dispatchers.Default) {
             runCatching {
                 sessionRepository.updateSession(updated)
+            }.onFailure { err ->
+                handleError(err)
+            }
+        }
+    }
+
+    fun loadPatientById(patientId: String) {
+        scope.launch(Dispatchers.Default) {
+            runCatching {
+                val patient = patientRepository.getById(patientId)
+                if (patient != null) {
+                    currentSessionId = patient.id
+                    val sessions = sessionRepository.observeSessions(patientId).firstOrNull()
+                    val session = sessions?.firstOrNull() ?: sessionRepository.createSession(patientId)
+                    val tasks = sessionRepository.getTasks(session.id)
+                    val attachments = sessionRepository.getAttachments(session.id)
+                    val problemChains = ensureProblemChainDefaults(session.id, sessionRepository.getProblemChains(session.id))
+                    val problemGoals = sessionRepository.getProblemGoals(session.id)
+                    val psychometrics = sessionRepository.getPsychometrics(session.id)
+                    val dysregulation = sessionRepository.getDysregulation(session.id)
+                    val biosocial = sessionRepository.getBiosocial(session.id)
+                    val treatmentObjectives = ensureTreatmentObjectiveDefaults(session.id, sessionRepository.getTreatmentObjectives(session.id))
+                    val problemAnalyses = ensureProblemAnalysisDefaults(session.id, sessionRepository.getProblemAnalyses(session.id))
+                    val evolutionNotes = ensureEvolutionNoteDefaults(session.id, sessionRepository.getEvolutionNotes(session.id))
+                    val history = sessionRepository.getHistory(session.id)
+
+                    _state.value = SessionFormState(
+                        patient = patient,
+                        session = session,
+                        tasks = tasks,
+                        attachments = attachments,
+                        familyNotes = session.familyNotes.orEmpty(),
+                        problemChains = problemChains,
+                        problemGoals = problemGoals,
+                        psychometrics = psychometrics,
+                        dysregulation = dysregulation,
+                        biosocial = biosocial,
+                        treatmentObjectives = treatmentObjectives,
+                        problemAnalyses = problemAnalyses,
+                        evolutionNotes = evolutionNotes,
+                        history = history,
+                        isLoading = false,
+                        error = null
+                    )
+                } else {
+                    _state.update { it.copy(error = "Paciente no encontrado") }
+                }
             }.onFailure { err ->
                 handleError(err)
             }
@@ -359,6 +406,66 @@ class SessionFormViewModel(
 
     fun dispose() {
         scope.coroutineContext[Job]?.cancel()
+    }
+
+    fun saveSession() {
+        scope.launch(Dispatchers.Default) {
+            runCatching {
+                val currentState = _state.value
+                val patient = currentState.patient
+                val session = currentState.session
+
+                if (patient != null && session != null) {
+                    // Guardar paciente
+                    patientRepository.upsert(patient)
+
+                    // Guardar sesión principal
+                    sessionRepository.updateSession(session)
+
+                    // Guardar tareas
+                    currentState.tasks?.let { tasks ->
+                        sessionRepository.upsertTasks(tasks.copy(sessionId = session.id))
+                    }
+
+                    // Guardar cadenas de problemas
+                    sessionRepository.upsertProblemChains(currentState.problemChains.map { it.copy(sessionId = session.id) })
+
+                    // Guardar metas de problemas
+                    currentState.problemGoals?.let { goals ->
+                        sessionRepository.upsertProblemGoals(goals.copy(sessionId = session.id))
+                    }
+
+                    // Guardar datos psicométricos
+                    currentState.psychometrics?.let { psychometrics ->
+                        sessionRepository.upsertPsychometrics(psychometrics.copy(sessionId = session.id))
+                    }
+
+                    // Guardar áreas de desregulación
+                    currentState.dysregulation?.let { dysregulation ->
+                        sessionRepository.upsertDysregulation(dysregulation.copy(sessionId = session.id))
+                    }
+
+                    // Guardar modelo biosocial
+                    currentState.biosocial?.let { biosocial ->
+                        sessionRepository.upsertBiosocial(biosocial.copy(sessionId = session.id))
+                    }
+
+                    // Guardar objetivos de tratamiento
+                    sessionRepository.upsertTreatmentObjectives(currentState.treatmentObjectives.map { it.copy(sessionId = session.id) })
+
+                    // Guardar análisis de problemas
+                    sessionRepository.upsertProblemAnalyses(currentState.problemAnalyses.map { it.copy(sessionId = session.id) })
+
+                    // Guardar notas de evolución
+                    sessionRepository.upsertEvolutionNotes(currentState.evolutionNotes.map { it.copy(sessionId = session.id) })
+
+                    // Actualizar estado para indicar que se guardó correctamente
+                    _state.update { it.copy(error = null) }
+                }
+            }.onFailure { err ->
+                handleError(err)
+            }
+        }
     }
 
     fun registerAttachment(attachment: Attachment) {
@@ -607,5 +714,45 @@ class SessionFormViewModel(
 
     private fun handleError(err: Throwable) {
         _state.update { it.copy(error = err.message, isLoading = false) }
+    }
+
+    suspend fun createSessionStateForPatient(patientId: String): SessionFormState? {
+        return try {
+            val patient = patientRepository.getById(patientId) ?: return null
+            val sessions = sessionRepository.observeSessions(patientId).firstOrNull()
+            val session = sessions?.firstOrNull() ?: sessionRepository.createSession(patientId)
+            val tasks = sessionRepository.getTasks(session.id)
+            val attachments = sessionRepository.getAttachments(session.id)
+            val problemChains = ensureProblemChainDefaults(session.id, sessionRepository.getProblemChains(session.id))
+            val problemGoals = sessionRepository.getProblemGoals(session.id)
+            val psychometrics = sessionRepository.getPsychometrics(session.id)
+            val dysregulation = sessionRepository.getDysregulation(session.id)
+            val biosocial = sessionRepository.getBiosocial(session.id)
+            val treatmentObjectives = ensureTreatmentObjectiveDefaults(session.id, sessionRepository.getTreatmentObjectives(session.id))
+            val problemAnalyses = ensureProblemAnalysisDefaults(session.id, sessionRepository.getProblemAnalyses(session.id))
+            val evolutionNotes = ensureEvolutionNoteDefaults(session.id, sessionRepository.getEvolutionNotes(session.id))
+            val history = sessionRepository.getHistory(session.id)
+
+            SessionFormState(
+                patient = patient,
+                session = session,
+                tasks = tasks,
+                attachments = attachments,
+                familyNotes = session.familyNotes.orEmpty(),
+                problemChains = problemChains,
+                problemGoals = problemGoals,
+                psychometrics = psychometrics,
+                dysregulation = dysregulation,
+                biosocial = biosocial,
+                treatmentObjectives = treatmentObjectives,
+                problemAnalyses = problemAnalyses,
+                evolutionNotes = evolutionNotes,
+                history = history,
+                isLoading = false,
+                error = null
+            )
+        } catch (e: Exception) {
+            null
+        }
     }
 }

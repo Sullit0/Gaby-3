@@ -7,10 +7,18 @@ import org.koin.core.context.startKoin
 import org.koin.dsl.module
 
 object AppInitializer {
-    fun init(factory: DatabaseFactory): KoinApplication =
-        startKoin {
-            modules(
-                databaseModule(factory)
-            )
+    private var isInitialized = false
+
+    fun init(factory: DatabaseFactory): KoinApplication? {
+        return if (!isInitialized) {
+            isInitialized = true
+            startKoin {
+                modules(
+                    databaseModule(factory)
+                )
+            }
+        } else {
+            null
         }
+    }
 }

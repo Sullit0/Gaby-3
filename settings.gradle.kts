@@ -7,4 +7,4 @@ pluginManagement {
 }
 
 rootProject.name = "psych-notes"
-include(":shared", ":desktopApp")
+include(":shared", ":desktopApp", ":androidApp")

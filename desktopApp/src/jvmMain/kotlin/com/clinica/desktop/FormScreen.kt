@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
@@ -30,7 +32,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -120,7 +122,8 @@ import androidx.compose.ui.unit.toSize
 fun SessionFormScreen(
     modifier: Modifier = Modifier,
     storageRoot: Path,
-    composeWindow: ComposeWindow? = null
+    composeWindow: ComposeWindow? = null,
+    selectedPatientId: String? = null
 ) {
     val koin = GlobalContext.get()
     val viewModel = remember {
@@ -131,7 +134,11 @@ fun SessionFormScreen(
         )
     }
     DisposableEffect(Unit) {
-        viewModel.loadDefaultPatient()
+        if (selectedPatientId != null) {
+            viewModel.loadPatientById(selectedPatientId)
+        } else {
+            viewModel.loadDefaultPatient()
+        }
         onDispose { viewModel.dispose() }
     }
 
@@ -273,6 +280,52 @@ fun SessionFormScreen(
                 isDragHovering = isDragHovering
             )
         }
+
+        // Botón de guardar al final
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                var isSaving by remember { mutableStateOf(false) }
+                    var saveSuccess by remember { mutableStateOf(false) }
+
+                    Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            isSaving = true
+                            saveSuccess = false
+                            viewModel.saveSession()
+                            // Pequeña espera para asegurar que se guarde
+                            kotlinx.coroutines.delay(500)
+                            isSaving = false
+                            saveSuccess = true
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(0.5f),
+                    enabled = state.patient != null && state.session != null && !isSaving
+                ) {
+                    if (isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Guardando...")
+                    } else {
+                        Text(if (saveSuccess) "✓ Guardado" else "Guardar Ficha")
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -283,10 +336,10 @@ private fun SectionCard(
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F7F9)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp)
+            .padding(horizontal = 32.dp)
     ) {
         Column(
             modifier = Modifier
@@ -600,7 +653,7 @@ private fun TreatmentObjectivesSection(state: SessionFormState, viewModel: Sessi
                 }
             }
             if (stage != grouped.keys.last()) {
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             }
         }
     }
@@ -703,7 +756,7 @@ private fun ProblemAnalysisSection(state: SessionFormState, viewModel: SessionFo
                         Text(
                             text = "#${analysis.problemNumber}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color.Gray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.align(Alignment.CenterVertically)
                         )
                     }
@@ -1094,7 +1147,7 @@ private fun stageLabel(stage: TreatmentObjective.Stage): String = when (stage) {
     TreatmentObjective.Stage.SECUNDARIOS -> "Objetivos secundarios"
 }
 
-private fun calculateAge(birthDate: LocalDate): Int {
+fun calculateAge(birthDate: LocalDate): Int {
     val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
     if (birthDate > today) return 0
     return birthDate.periodUntil(today).years
@@ -1158,7 +1211,7 @@ private fun openAttachment(path: Path) {
     }
 }
 
-private fun formatDate(date: LocalDate): String = date.toString()
+fun formatDate(date: LocalDate): String = date.toString()
 
 private fun LocalDate.toEpochMillis(): Long =
     this.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()

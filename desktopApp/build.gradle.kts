@@ -12,7 +12,7 @@ dependencies {
     implementation("io.insert-koin:koin-core:3.5.3")
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
     implementation("com.benasher44:uuid:0.8.2")
-}
+    }
 
 kotlin {
     jvmToolchain(17)

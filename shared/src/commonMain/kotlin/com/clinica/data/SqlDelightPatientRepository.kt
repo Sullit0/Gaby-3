@@ -34,6 +34,10 @@ class SqlDelightPatientRepository(
         queries.selectPatientById(id).executeAsOneOrNull()?.toDomain()
     }
 
+    override suspend fun getAllPatients(): List<Patient> = withContext(Dispatchers.Default) {
+        queries.selectAllPatients().executeAsList().map { it.toDomain() }
+    }
+
     override fun observeAll(): Flow<List<Patient>> =
         queries.selectAllPatients()
             .asFlow()
@@ -41,5 +45,9 @@ class SqlDelightPatientRepository(
 
     override suspend fun delete(id: String) = withContext(Dispatchers.Default) {
         queries.deletePatient(id)
+    }
+
+    override suspend fun deletePatient(patientId: String) = withContext(Dispatchers.Default) {
+        queries.deletePatient(patientId)
     }
 }

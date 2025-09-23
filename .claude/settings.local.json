@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(.gradlew.bat:*)",
+      "Bash(./gradlew:*)",
+      "Bash(echo:*)",
+      "Read(//c/**)",
+      "Bash(find:*)",
+      "Bash(sqlite3:*)",
+      "WebSearch",
+      "Bash(taskkill:*)",
+      "Bash(adb:*)",
+      "Bash(\"$ANDROID_HOME/platform-tools/adb.exe\":*)",
+      "Bash(gradlew:*)",
+      "Bash(.gradlew:*)",
+      "Bash(dir:*)",
+      "Bash(./gradlew.bat:*)",
+      "Bash(tree:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

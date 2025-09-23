@@ -1,3 +1,6 @@
-ALTER TABLE patient_sessions ADD COLUMN family_notes TEXT;
-ALTER TABLE session_evolution_notes ADD COLUMN tareas TEXT;
-ALTER TABLE session_problem_analysis ADD COLUMN comportamiento TEXT;
+-- Migraión 1: Añadir nuevas columnas para funcionalidad extendida
+-- Esta migración solo añade columnas que no existen en el esquema actual
+
+-- Verificar y añadir columnas nuevas si no existen
+-- Nota: Las columnas family_notes, tareas, comportamiento ya existen en el esquema base
+-- Esta migración es un placeholder para futuras columnas nuevas

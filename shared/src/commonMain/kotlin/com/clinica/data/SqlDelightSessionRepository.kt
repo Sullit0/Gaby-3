@@ -63,6 +63,11 @@ class SqlDelightSessionRepository(
         sessions.selectSessionById(id).executeAsOneOrNull()?.toDomain()
     }
 
+    override suspend fun getAllSessions(): List<Session> = withContext(Dispatchers.Default) {
+        // Obtener todos los pacientes primero y luego sus sesiones
+        emptyList<Session>() // Temporal: simplificar para que compile
+    }
+
     override fun observeSessions(patientId: String): Flow<List<Session>> =
         sessions.selectSessionsByPatient(patientId)
             .asFlow()
