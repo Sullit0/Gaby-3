@@ -3,8 +3,10 @@ package com.clinica.desktop
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -13,10 +15,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.core.*
+import androidx.compose.animation.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.clinica.desktop.calculateAge
 import com.clinica.app.form.SessionFormViewModel
 import com.clinica.domain.model.Patient
 import com.clinica.domain.model.Session
+import com.clinica.domain.model.Attachment
+import kotlinx.datetime.LocalDate
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
 import kotlinx.coroutines.launch
 import org.koin.core.context.GlobalContext
 import kotlinx.coroutines.CoroutineScope
@@ -30,6 +40,20 @@ import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.Instant
 import kotlinx.datetime.periodUntil
 import java.awt.Desktop
+import java.awt.print.PrinterJob
+import java.awt.print.PrinterException
+import java.awt.print.Printable
+import java.awt.print.PageFormat
+import java.awt.print.Paper
+import java.awt.Graphics
+import java.awt.Graphics2D
+import java.awt.Font
+import java.awt.Color
+import javax.imageio.ImageIO
+import java.io.File
+import org.apache.pdfbox.pdmodel.PDDocument
+import org.apache.pdfbox.rendering.PDFRenderer
+import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,6 +75,7 @@ fun PatientsTableScreen(
     var sessions by remember { mutableStateOf<List<Session>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var searchQuery by remember { mutableStateOf("") }
+    var expandedPatientId by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -227,28 +252,45 @@ fun PatientsTableScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         items(filteredPatients) { patient ->
-                            PatientTableRow(
-                                patient = patient,
-                                lastSession = getLastSessionDate(patient.id) ?: "Sin sesiones",
-                                onSelect = { onPatientSelect(patient.id) },
-                                onDelete = {
-                                    scope.launch {
-                                        try {
-                                            viewModel.patientRepository.deletePatient(patient.id)
-                                            patients = patients.filter { it.id != patient.id }
-                                        } catch (e: Exception) {
-                                            // Handle error
+                            val isExpanded = expandedPatientId == patient.id
+                            
+                            Column {
+                                PatientTableRow(
+                                    patient = patient,
+                                    lastSession = getLastSessionDate(patient.id) ?: "Sin sesiones",
+                                    isExpanded = isExpanded,
+                                    onSelect = { 
+                                        expandedPatientId = if (isExpanded) null else patient.id
+                                    },
+                                    onDelete = {
+                                        scope.launch {
+                                            try {
+                                                viewModel.patientRepository.deletePatient(patient.id)
+                                                patients = patients.filter { it.id != patient.id }
+                                            } catch (e: Exception) {
+                                                // Handle error
+                                            }
                                         }
-                                    }
-                                },
-                                scope = scope,
-                                viewModel = viewModel
-                            )
+                                    },
+                                    scope = scope,
+                                    viewModel = viewModel
+                                )
+                                
+                                // Panel expandible con detalles del paciente
+                                AnimatedVisibility(
+                                    visible = isExpanded,
+                                    enter = expandVertically() + fadeIn(),
+                                    exit = shrinkVertically() + fadeOut()
+                                ) {
+                                    PatientDetailsPanel(
+                                        patient = patient,
+                                        viewModel = viewModel,
+                                        scope = scope
+                                    )
+                                }
+                            }
                             HorizontalDivider()
                         }
-                    }
-                }
-            }
         }
     }
 }
@@ -257,6 +299,7 @@ fun PatientsTableScreen(
 private fun PatientTableRow(
     patient: Patient,
     lastSession: String,
+    isExpanded: Boolean,
     onSelect: () -> Unit,
     onDelete: () -> Unit,
     scope: CoroutineScope,
@@ -367,17 +410,15 @@ private fun PatientTableRow(
                             // Obtener el estado completo del formulario para este paciente
                             val formState = viewModel.createSessionStateForPatient(patient.id)
                             if (formState != null) {
-                                // Generar el PDF
-                                val downloadsFolder = System.getProperty("user.home") + "/Downloads"
-                                val fileName = "Ficha_${patient.displayName.replace(" ", "_")}_${java.time.LocalDate.now()}.txt"
+                                // Generar el PDF y guardarlo en Descargas
+                                val downloadsFolder = getDownloadsFolder()
+                                val fileName = "Ficha_${patient.displayName.replace(" ", "_")}_${java.time.LocalDate.now()}.pdf"
                                 val outputPath = java.nio.file.Paths.get(downloadsFolder, fileName)
                                 
                                 val success = PDFGenerator.generatePDF(formState, outputPath)
                                 if (success) {
-                                    // Abrir el archivo generado
-                                    if (Desktop.isDesktopSupported()) {
-                                        Desktop.getDesktop().open(outputPath.toFile())
-                                    }
+                                    // Abrir el diálogo de impresión del sistema
+                                    printPDFWithDialog(outputPath.toFile())
                                 }
                             }
                         } catch (e: Exception) {
@@ -396,5 +437,319 @@ private fun PatientTableRow(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PatientDetailsPanel(
+    patient: Patient,
+    viewModel: SessionFormViewModel,
+    scope: CoroutineScope
+) {
+    var attachments by remember { mutableStateOf<List<Attachment>>(emptyList()) }
+    var isLoadingAttachments by remember { mutableStateOf(true) }
+    val storageRoot = Paths.get(System.getProperty("user.home"), "clinica_data")
+
+    LaunchedEffect(patient.id) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                // Obtener todas las sesiones del paciente
+                val sessions = viewModel.sessionRepository.getSessionsByPatient(patient.id)
+                // Obtener todos los adjuntos de todas las sesiones
+                val allAttachments = sessions.flatMap { session ->
+                    viewModel.sessionRepository.getAttachmentsBySession(session.id)
+                }
+                attachments = allAttachments
+                isLoadingAttachments = false
+            } catch (e: Exception) {
+                println("Error al cargar adjuntos: ${e.message}")
+                isLoadingAttachments = false
+            }
+        }
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        ),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Header del panel
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Detalles del Paciente",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Icon(
+                    Icons.Outlined.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f)
+            )
+
+            // Información básica del paciente
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "Información Personal",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    InfoItem("DNI", patient.dni ?: "No especificado")
+                    InfoItem("Género", patient.gender ?: "No especificado")
+                    InfoItem("Edad", patient.birthDate?.let { "${calculateAge(it)} años" } ?: "No especificado")
+                }
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "Contacto",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    InfoItem("Teléfono", patient.phone ?: "No especificado")
+                    InfoItem("Dirección", patient.address ?: "No especificado")
+                }
+            }
+
+            // Sección de adjuntos
+            if (isLoadingAttachments) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(60.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            } else if (attachments.isNotEmpty()) {
+                Column {
+                    Text(
+                        text = "Archivos Adjuntos (${attachments.size})",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    attachments.forEach { attachment ->
+                        AttachmentItem(
+                            attachment = attachment,
+                            storageRoot = storageRoot,
+                            patientId = patient.id
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                }
+            } else {
+                Text(
+                    text = "No hay archivos adjuntos",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun InfoItem(
+    label: String,
+    value: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+        )
+    }
+}
+
+@Composable
+private fun AttachmentItem(
+    attachment: Attachment,
+    storageRoot: Path,
+    patientId: String
+) {
+    var isHovered by remember { mutableStateOf(false) }
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                val path = storageRoot.resolve(patientId)
+                    .resolve(attachment.sessionId)
+                    .resolve(attachment.storedName)
+                if (Files.exists(path)) {
+                    try {
+                        Desktop.getDesktop().open(path.toFile())
+                    } catch (e: Exception) {
+                        println("Error al abrir archivo: ${e.message}")
+                    }
+                }
+            }
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .background(
+                if (isHovered) 
+                    MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.1f) 
+                else 
+                    Color.Transparent,
+                shape = RoundedCornerShape(4.dp)
+            ),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Outlined.AttachFile,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(20.dp)
+            )
+            Column {
+                Text(
+                    text = attachment.displayName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    maxLines = 1
+                )
+                Text(
+                    text = "${formatFileSize(attachment.sizeBytes)} • ${attachment.mimeType ?: "Tipo desconocido"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                )
+            }
+        }
+        Icon(
+            Icons.Outlined.OpenInNew,
+            contentDescription = "Abrir archivo",
+            tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = if (isHovered) 1f else 0.5f),
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+private fun formatFileSize(bytes: Long): String {
+    return when {
+        bytes < 1024 -> "$bytes B"
+        bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+        bytes < 1024 * 1024 * 1024 -> "${bytes / (1024 * 1024)} MB"
+        else -> "${bytes / (1024 * 1024 * 1024)} GB"
+    }
+}
+
+// Función para obtener la carpeta de descargas de forma multiplataforma
+private fun getDownloadsFolder(): String {
+    val osName = System.getProperty("os.name").lowercase()
+    return when {
+        osName.contains("win") -> {
+            // Windows
+            val userHome = System.getProperty("user.home")
+            "$userHome\\Downloads"
+        }
+        osName.contains("mac") -> {
+            // macOS
+            val userHome = System.getProperty("user.home")
+            "$userHome/Downloads"
+        }
+        else -> {
+            // Linux y otros sistemas Unix-like
+            val userHome = System.getProperty("user.home")
+            "$userHome/Downloads"
+        }
+    }
+}
+
+// Función para imprimir PDF mostrando el diálogo de impresión del sistema
+private fun printPDFWithDialog(pdfFile: File) {
+    try {
+        // Usar Desktop para abrir el diálogo de impresión
+        if (Desktop.isDesktopSupported()) {
+            val desktop = Desktop.getDesktop()
+            if (desktop.isSupported(Desktop.Action.PRINT)) {
+                desktop.print(pdfFile)
+            } else {
+                // Si no se soporta la acción PRINT, abrir el archivo para que el usuario lo imprima manualmente
+                desktop.open(pdfFile)
+            }
+        } else {
+            println("Desktop no está soportado en este sistema")
+            // Alternativa: abrir el archivo con el visor de PDF predeterminado
+            openFileWithDefaultApplication(pdfFile)
+        }
+    } catch (e: Exception) {
+        println("Error al intentar imprimir: ${e.message}")
+        e.printStackTrace()
+        // Alternativa: abrir el archivo con el visor de PDF predeterminado
+        openFileWithDefaultApplication(pdfFile)
+    }
+}
+
+// Función alternativa para abrir archivos en sistemas que no soportan Desktop
+private fun openFileWithDefaultApplication(file: File) {
+    try {
+        val osName = System.getProperty("os.name").lowercase()
+        when {
+            osName.contains("win") -> {
+                // Windows: usar cmd para abrir el archivo
+                val command = "cmd /c start \"\" \"${file.absolutePath}\""
+                Runtime.getRuntime().exec(command)
+            }
+            osName.contains("mac") -> {
+                // macOS: usar open command
+                val command = arrayOf("open", file.absolutePath)
+                Runtime.getRuntime().exec(command)
+            }
+            else -> {
+                // Linux y otros: usar xdg-open
+                val command = arrayOf("xdg-open", file.absolutePath)
+                Runtime.getRuntime().exec(command)
+            }
+        }
+    } catch (e: Exception) {
+        println("Error al abrir el archivo: ${e.message}")
+        e.printStackTrace()
     }
 }

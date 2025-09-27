@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -219,20 +220,20 @@ fun SessionFormScreen(
             .fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        SectionCard(title = "IdentificaciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n del paciente") {
+        SectionCard(title = "Identificación del paciente") {
             IdentificationSection(state, viewModel)
         }
 
-        SectionCard(title = "Datos familiares de interÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©s") {
+        SectionCard(title = "Datos familiares de interés") {
             ControlledLargeTextField(
-                label = "DescripciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n",
+                label = "Descripción",
                 value = state.familyNotes,
                 onValueChange = { viewModel.updateFamilyNotes(it) },
-                placeholder = "Historia familiar, vÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â­nculos, hitos relevantes"
+                placeholder = "Historia familiar, vínculos, hitos relevantes"
             )
         }
 
-        SectionCard(title = "AnÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡lisis en cadena de los problemas principales") {
+        SectionCard(title = "Análisis en cadena de los problemas principales") {
             ProblemChainSection(state, viewModel)
             Spacer(modifier = Modifier.height(12.dp))
             ControlledLargeTextField(
@@ -242,11 +243,11 @@ fun SessionFormScreen(
             )
         }
 
-        SectionCard(title = "Datos psicomÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tricos (de corresponder)") {
+        SectionCard(title = "Datos psicométricos (de corresponder)") {
             PsychometricsSection(state, viewModel)
         }
 
-        SectionCard(title = "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âreas de desregulaciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n") {
+        SectionCard(title = "Áreas de desregulación") {
             DysregulationSection(state, viewModel)
         }
 
@@ -258,16 +259,16 @@ fun SessionFormScreen(
             TreatmentObjectivesSection(state, viewModel)
         }
 
-        SectionCard(title = "EvoluciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n de los objetivos") {
+        SectionCard(title = "Evolución de los objetivos") {
             ProblemAnalysisSection(state, viewModel)
         }
 
-        SectionCard(title = "Apuntes de evoluciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n psicoterapÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©utica") {
+        SectionCard(title = "Apuntes de evolución psicoterapéutica") {
             EvolutionNotesSection(state, viewModel)
         }
 
         SectionCard(
-            title = "Tareas / Adjuntos de la sesiÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n",
+            title = "Tareas / Adjuntos de la sesión",
             actions = {
                 IconButton(
                     onClick = {
@@ -297,7 +298,7 @@ fun SessionFormScreen(
             )
         }
 
-        // BotÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n de guardar al final
+        // Botón de guardar y acciones al final
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             modifier = Modifier
@@ -308,26 +309,29 @@ fun SessionFormScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(20.dp),
-                horizontalArrangement = Arrangement.Center,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 var isSaving by remember { mutableStateOf(false) }
-                    var saveSuccess by remember { mutableStateOf(false) }
+                var saveSuccess by remember { mutableStateOf(false) }
+                var isPrinting by remember { mutableStateOf(false) }
+                var isGeneratingPDF by remember { mutableStateOf(false) }
 
-                    Button(
+                // Botón de guardar
+                Button(
                     onClick = {
                         coroutineScope.launch {
                             isSaving = true
                             saveSuccess = false
                             viewModel.saveSession()
-                            // PequeÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±a espera para asegurar que se guarde
+                            // Pequeña espera para asegurar que se guarde
                             kotlinx.coroutines.delay(500)
                             isSaving = false
                             saveSuccess = true
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(0.5f),
-                    enabled = state.patient != null && state.session != null && !isSaving
+                    modifier = Modifier.weight(1f),
+                    enabled = state.patient != null && state.session != null && !isSaving && !isPrinting && !isGeneratingPDF
                 ) {
                     if (isSaving) {
                         CircularProgressIndicator(
@@ -337,7 +341,70 @@ fun SessionFormScreen(
                         Spacer(Modifier.width(8.dp))
                         Text("Guardando...")
                     } else {
-                        Text(if (saveSuccess) "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ Guardado" else "Guardar Ficha")
+                        Text(if (saveSuccess) "✓ Guardado" else "Guardar Ficha")
+                    }
+                }
+
+                // Botón de impresión (icono)
+                IconButton(
+                    onClick = {
+                        coroutineScope.launch {
+                            isPrinting = true
+                            // Usar la plantilla que el usuario adjuntó
+                            val templatePath = Paths.get(System.getProperty("user.home"), "ficha de consulta (1).docx")
+                            val result = WordDocumentGenerator.fillTemplateAndPrint(state, templatePath)
+                            isPrinting = false
+                            
+                            if (result != null) {
+                                println("Documento enviado a impresión: $result")
+                            } else {
+                                println("Error al generar documento para impresión")
+                            }
+                        }
+                    },
+                    enabled = state.patient != null && state.session != null && !isSaving && !isPrinting && !isGeneratingPDF
+                ) {
+                    if (isPrinting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(Icons.Outlined.Print, contentDescription = "Imprimir ficha", modifier = Modifier.size(24.dp))
+                    }
+                }
+
+                // Botón para generar documento Word (opcional para descarga)
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            isGeneratingPDF = true
+                            // Ruta de la plantilla (puedes cambiarla a donde tengas tu plantilla .docx)
+                            val templatePath = Paths.get(System.getProperty("user.home"), "ficha de consulta (1).docx")
+                            val result = WordDocumentGenerator.fillTemplateForPatient(state, templatePath)
+                            isGeneratingPDF = false
+                            
+                            if (result != null) {
+                                // Mostrar mensaje de éxito o abrir el archivo
+                                println("Documento Word generado en: $result")
+                            } else {
+                                // Mostrar mensaje de error
+                                println("Error al generar documento Word")
+                            }
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = state.patient != null && state.session != null && !isSaving && !isPrinting && !isGeneratingPDF
+                ) {
+                    if (isGeneratingPDF) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Generar Word")
+                    } else {
+                        Text("Descargar Word")
                     }
                 }
             }
@@ -360,7 +427,7 @@ private fun EmptySessionPlaceholder(modifier: Modifier) {
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
-                text = "Crea un paciente desde la gestiÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n o elige uno existente para comenzar a completar la ficha.",
+                text = "Crea un paciente desde la gestión o elige uno existente para comenzar a completar la ficha.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -430,7 +497,7 @@ private fun IdentificationSection(state: SessionFormState, viewModel: SessionFor
                 modifier = Modifier.weight(2f)
             )
             FormDateField(
-                label = "Fecha de Primera AtenciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n",
+                label = "Fecha de Primera Atención",
                 value = session?.firstAttentionDate,
                 onValueChange = { viewModel.updateFirstAttentionDate(it) },
                 modifier = Modifier.weight(1f)
@@ -448,11 +515,11 @@ private fun IdentificationSection(state: SessionFormState, viewModel: SessionFor
             )
             FormReadOnlyField(
                 label = "Edad",
-                value = patient?.birthDate?.let { "${calculateAge(it)} aÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â±os" } ?: "",
+                value = patient?.birthDate?.let { "${calculateAge(it)} años" } ?: "",
                 modifier = Modifier.weight(0.7f)
             )
             FormTextField(
-                label = "GÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©nero",
+                label = "Género",
                 value = patient?.gender.orEmpty(),
                 onValueChange = { viewModel.updateGender(it) },
                 modifier = Modifier.weight(1f)
@@ -463,19 +530,19 @@ private fun IdentificationSection(state: SessionFormState, viewModel: SessionFor
             horizontalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             FormTextField(
-                label = "DirecciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n actual",
+                label = "Dirección actual",
                 value = patient?.address.orEmpty(),
                 onValueChange = { viewModel.updateDireccion(it) },
                 modifier = Modifier.weight(2f)
             )
             FormTextField(
-                label = "NÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° DNI",
+                label = "N° DNI",
                 value = patient?.dni.orEmpty(),
                 onValueChange = { viewModel.updateDni(it) },
                 modifier = Modifier.weight(1f)
             )
             FormTextField(
-                label = "NÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â° Celular",
+                label = "N° Celular",
                 value = patient?.phone.orEmpty(),
                 onValueChange = { viewModel.updatePhone(it) },
                 modifier = Modifier.weight(1f)
@@ -612,7 +679,7 @@ private fun PsychometricsSection(state: SessionFormState, viewModel: SessionForm
                 minLines = 2
             )
             FormTextField(
-                label = "ClasificaciÃ³n",
+                label = "Clasificación",
                 value = data.coeficienteClasificacion.orEmpty(),
                 onValueChange = { value -> viewModel.updatePsychometrics { it.copy(coeficienteClasificacion = value) } },
                 modifier = Modifier.weight(1f),
@@ -632,7 +699,7 @@ private fun PsychometricsSection(state: SessionFormState, viewModel: SessionForm
             minLines = 2
         )
         FormTextField(
-            label = "AtenciÃ³n y concentraciÃ³n",
+            label = "Atención y concentración",
             value = data.atencion.orEmpty(),
             onValueChange = { value -> viewModel.updatePsychometrics { it.copy(atencion = value) } },
             minLines = 2
@@ -644,13 +711,13 @@ private fun PsychometricsSection(state: SessionFormState, viewModel: SessionForm
             minLines = 2
         )
         FormTextField(
-            label = "DinÃ¡mica familiar",
+            label = "Dinámica familiar",
             value = data.dinamicaFamiliar.orEmpty(),
             onValueChange = { value -> viewModel.updatePsychometrics { it.copy(dinamicaFamiliar = value) } },
             minLines = 2
         )
         FormTextField(
-            label = "Otros de interÃ©s",
+            label = "Otros de interés",
             value = data.otrosInteres.orEmpty(),
             onValueChange = { value -> viewModel.updatePsychometrics { it.copy(otrosInteres = value) } },
             minLines = 2
@@ -699,7 +766,7 @@ private fun DysregulationSection(state: SessionFormState, viewModel: SessionForm
             minLines = 2
         )
         FormCell(
-            label = "AplicaciÃ³n de BsL-23 (siempre y cuando se sospeche de TLP)",
+            label = "Aplicación de BsL-23 (siempre y cuando se sospeche de TLP)",
             modifier = Modifier.fillMaxWidth(),
             backgroundColor = Color.White
         ) {
@@ -750,7 +817,7 @@ private fun BiosocialSection(state: SessionFormState, viewModel: SessionFormView
             minLines = 2
         )
         FormTextField(
-            label = "InvalidaciÃ³n ambiental",
+            label = "Invalidación ambiental",
             value = data.invalidacionAmbiental.orEmpty(),
             onValueChange = { value -> viewModel.updateBiosocial { it.copy(invalidacionAmbiental = value) } },
             minLines = 2
@@ -832,7 +899,7 @@ private fun ProblemAnalysisSection(state: SessionFormState, viewModel: SessionFo
                     )
                 }
                 FormTextField(
-                    label = "DescripciÃ³n",
+                    label = "Descripción",
                     value = analysis.comportamiento.orEmpty(),
                     onValueChange = { value ->
                         viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(comportamiento = value) }
@@ -840,7 +907,7 @@ private fun ProblemAnalysisSection(state: SessionFormState, viewModel: SessionFo
                     minLines = 2
                 )
                 FormTextField(
-                    label = "AnÃ¡lisis de la soluciÃ³n",
+                    label = "Análisis de la solución",
                     value = analysis.analisisSolucion.orEmpty(),
                     onValueChange = { value ->
                         viewModel.updateProblemAnalysis(analysis.problemNumber) { it.copy(analisisSolucion = value) }
@@ -956,7 +1023,7 @@ private fun EvolutionNotesSection(state: SessionFormState, viewModel: SessionFor
                     horizontalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
                     FormTextField(
-                        label = "SesiÃ³n",
+                        label = "Sesión",
                         value = note.titulo,
                         onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(titulo = value) } },
                         modifier = Modifier.weight(1f),
@@ -1005,7 +1072,7 @@ private fun EvolutionNotesSection(state: SessionFormState, viewModel: SessionFor
             }
         }
         Button(onClick = { viewModel.addEvolutionNote() }) {
-            Text("Agregar sesiÃ³n")
+            Text("Agregar sesión")
         }
     }
 }
@@ -1138,8 +1205,8 @@ private fun AttachmentTasksField(
                     innerTextField()
                 }
             },
-            placeholder = { Text("Describe las tareas y aÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±ade tags como [archivo.pdf]") },
-            label = { Text("DescripciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n de tareas") },
+            placeholder = { Text("Describe las tareas y añade tags como [archivo.pdf]") },
+            label = { Text("Descripción de tareas") },
             singleLine = false,
             enabled = true,
             isError = false,
@@ -1163,7 +1230,8 @@ private class TokenHighlightTransformation(
 }
 
 @Composable
-@Composable
+private fun FormCell(
+    label: String,
     modifier: Modifier = Modifier,
     labelColor: Color = MaterialTheme.colorScheme.onSurface,
     backgroundColor: Color = Color.White,
@@ -1183,26 +1251,6 @@ private class TokenHighlightTransformation(
                 color = labelColor
             )
         }
-        content()
-    }
-}
-    label: String,
-    modifier: Modifier = Modifier,
-    labelColor: Color = MaterialTheme.colorScheme.onSurface,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Column(
-        modifier = modifier
-            .border(1.dp, Color.Black)
-            .background(Color.White)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = labelColor
-        )
         content()
     }
 }
@@ -1265,7 +1313,30 @@ private fun FormReadOnlyField(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RowScope.TableHeaderCell(
+    text: String,
+    modifier: Modifier = Modifier,
+    backgroundColor: Color = Color(0xFF4A4A4A)
+) {
+    Box(
+        modifier = modifier
+            .border(1.dp, Color.Black)
+            .background(backgroundColor)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White
+            ),
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FormDateField(
@@ -1327,111 +1398,7 @@ private fun FormDateField(
         }
     }
 }
-
 @Composable
-private fun RowScope.TableHeaderCell(
-    text: String,
-    modifier: Modifier = Modifier,
-    backgroundColor: Color = Color(0xFF4A4A4A)
-) {
-    Box(
-        modifier = modifier
-            .border(1.dp, Color.Black)
-            .background(backgroundColor)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White
-            ),
-            textAlign = TextAlign.Center
-        )
-    }
-}
-    label: String,
-
-@Composable
-private fun RowScope.TableHeaderCell(
-    text: String,
-    modifier: Modifier = Modifier,
-    backgroundColor: Color = Color(0xFF4A4A4A)
-) {
-    Box(
-        modifier = modifier
-            .border(1.dp, Color.Black)
-            .background(backgroundColor)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White
-            ),
-            textAlign = TextAlign.Center
-        )
-    }
-}
-    value: LocalDate?,
-    onValueChange: (LocalDate?) -> Unit,
-    modifier: Modifier = Modifier,
-    labelColor: Color = MaterialTheme.colorScheme.onSurface
-) {
-    var showDialog by rememberSaveable { mutableStateOf(false) }
-    val formatted = value?.let { formatDate(it) }.orEmpty()
-
-    FormCell(label = label, modifier = modifier, labelColor = labelColor) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showDialog = true }
-                .padding(vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = if (formatted.isEmpty()) "Seleccionar fecha" else formatted,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (formatted.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
-            )
-            Icon(
-                imageVector = Icons.Outlined.DateRange,
-                contentDescription = "Seleccionar fecha",
-                tint = MaterialTheme.colorScheme.onSurface
-            )
-        }
-    }
-
-    if (showDialog) {
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = value?.toEpochMillis())
-        DatePickerDialog(
-            onDismissRequest = { showDialog = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val selected = datePickerState.selectedDateMillis?.let { millis ->
-                            Instant.fromEpochMilliseconds(millis).toLocalDateTime(TimeZone.currentSystemDefault()).date
-                        }
-                        onValueChange(selected)
-                        showDialog = false
-                    }
-                ) {
-                    Text("Aceptar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDialog = false }) {
-                    Text("Cancelar")
-                }
-            }
-        ) {
-            DatePicker(state = datePickerState, showModeToggle = false)
-        }
-    }
 private fun ControlledLargeTextField(
     label: String,
     value: String,
@@ -1450,67 +1417,7 @@ private fun ControlledLargeTextField(
         placeholder = placeholder
     )
 }
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label) },
-        placeholder = placeholder?.let { { Text(it) } },
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = minHeight),
-        textStyle = MaterialTheme.typography.bodyMedium,
-        maxLines = Int.MAX_VALUE
-    )
-}
 
-@OptIn(ExperimentalMaterial3Api::class)
-    label: String,
-    value: LocalDate?,
-    onValueChange: (LocalDate?) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var showDialog by rememberSaveable { mutableStateOf(false) }
-    val textValue = value?.let { formatDate(it) }.orEmpty()
-
-    OutlinedTextField(
-        value = textValue,
-        onValueChange = {},
-        readOnly = true,
-        label = { Text(label) },
-        trailingIcon = {
-            IconButton(onClick = { showDialog = true }) {
-                Icon(Icons.Outlined.DateRange, contentDescription = "Seleccionar fecha")
-            }
-        },
-        modifier = modifier
-    )
-
-    if (showDialog) {
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = value?.toEpochMillis())
-        DatePickerDialog(
-            onDismissRequest = { showDialog = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    val selected = datePickerState.selectedDateMillis?.toLocalDate()
-                    onValueChange(selected)
-                    showDialog = false
-                }) {
-                    Text("Aceptar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    onValueChange(null)
-                    showDialog = false
-                }) {
-                    Text("Limpiar")
-                }
-            }
-        ) {
-            DatePicker(state = datePickerState, showModeToggle = false)
-        }
-    }
-}
 
 @Composable
 private fun AgeDisplay(modifier: Modifier, birthDate: LocalDate?) {
@@ -1524,7 +1431,7 @@ private fun AgeDisplay(modifier: Modifier, birthDate: LocalDate?) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(8.dp))
-        val ageText = birthDate?.let { "${calculateAge(it)} aÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±os" } ?: "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â"
+        val ageText = birthDate?.let { "${calculateAge(it)} años" } ?: "Sin datos"
         Text(
             text = ageText,
             style = MaterialTheme.typography.titleMedium,

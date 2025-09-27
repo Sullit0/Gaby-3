@@ -13,34 +13,127 @@ import org.apache.pdfbox.pdmodel.PDPage
 import org.apache.pdfbox.pdmodel.PDPageContentStream
 import org.apache.pdfbox.pdmodel.common.PDRectangle
 import org.apache.pdfbox.pdmodel.font.PDType1Font
-import org.apache.pdfbox.pdmodel.font.PDFont
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts
+import java.awt.Desktop
 import java.io.File
-import java.nio.file.Path
 import java.io.IOException
+import java.nio.file.Path
+import java.nio.file.Paths
 import kotlin.math.max
 
 class PDFGenerator {
 
     companion object {
-        // Constantes para el diseño del PDF
-        private const val PAGE_MARGIN = 50f
+        // Constantes para el diseño del PDF - Ajustadas para coincidir con el original
+        private const val PAGE_MARGIN = 40f
         private const val FONT_SIZE_NORMAL = 10f
         private const val FONT_SIZE_SMALL = 9f
         private const val FONT_SIZE_HEADER = 12f
-        private const val LINE_HEIGHT = 14f
-        private const val SECTION_MARGIN = 20f
-        private const val TABLE_BORDER_WIDTH = 0.5f
+        private const val LINE_HEIGHT = 12f
+        private const val SECTION_MARGIN = 15f
+        private const val TABLE_BORDER_WIDTH = 1f
         
-        // Fuentes
-        private val FONT_NORMAL = PDType1Font.HELVETICA
-        private val FONT_BOLD = PDType1Font.HELVETICA_BOLD
-        private val FONT_TIMES_BOLD = PDType1Font.TIMES_BOLD
-        private val FONT_TIMES_NORMAL = PDType1Font.TIMES_ROMAN
+        // Fuentes - Usar Times New Roman como en el original
+        private val FONT_NORMAL = PDType1Font(Standard14Fonts.FontName.TIMES_ROMAN)
+        private val FONT_BOLD = PDType1Font(Standard14Fonts.FontName.TIMES_BOLD)
+        private val FONT_TIMES_BOLD = PDType1Font(Standard14Fonts.FontName.TIMES_BOLD)
+        private val FONT_TIMES_NORMAL = PDType1Font(Standard14Fonts.FontName.TIMES_ROMAN)
 
         // Coordenadas basadas en el PDF original (A4: 595 x 842 puntos)
         private val PAGE_SIZE = PDRectangle.A4
         private val PAGE_WIDTH = PAGE_SIZE.width - 2 * PAGE_MARGIN
         private val PAGE_HEIGHT = PAGE_SIZE.height - 2 * PAGE_MARGIN
+
+        /**
+         * Función principal para generar el PDF de la ficha con datos rellenados
+         * @param state Estado del formulario con todos los datos
+         * @param outputPath Ruta donde se guardará el PDF
+         * @return true si se generó correctamente, false si hubo error
+         */
+        fun generateFilledFormPDF(state: SessionFormState, outputPath: Path): Boolean {
+            return try {
+                PDDocument().use { document ->
+                    val page = PDPage(PAGE_SIZE)
+                    document.addPage(page)
+                    
+                    PDPageContentStream(document, page).use { contentStream ->
+                        var currentY = PAGE_SIZE.height - PAGE_MARGIN
+                        
+                        // Generar cada sección con datos reales
+                        currentY = drawHeader(contentStream, currentY)
+                        currentY = drawIdentificationSection(contentStream, state, currentY)
+                        currentY = checkPageBreak(contentStream, currentY, 100f)
+                        
+                        currentY = drawFamilyDataSection(contentStream, state, currentY)
+                        currentY = checkPageBreak(contentStream, currentY, 200f)
+                        
+                        currentY = drawProblemChainSection(contentStream, state, currentY)
+                        currentY = checkPageBreak(contentStream, currentY, 100f)
+                        
+                        currentY = drawProblemGoalsSection(contentStream, state, currentY)
+                        currentY = checkPageBreak(contentStream, currentY, 150f)
+                        
+                        currentY = drawPsychometricsSection(contentStream, state, currentY)
+                        currentY = checkPageBreak(contentStream, currentY, 150f)
+                        
+                        currentY = drawDysregulationSection(contentStream, state, currentY)
+                        currentY = checkPageBreak(contentStream, currentY, 150f)
+                        
+                        currentY = drawBiosocialSection(contentStream, state, currentY)
+                        currentY = checkPageBreak(contentStream, currentY, 150f)
+                        
+                        currentY = drawTreatmentObjectivesSection(contentStream, state, currentY)
+                        currentY = checkPageBreak(contentStream, currentY, 200f)
+                        
+                        currentY = drawProblemAnalysisSection(contentStream, state, currentY)
+                        currentY = checkPageBreak(contentStream, currentY, 200f)
+                        
+                        currentY = drawEvolutionNotesSection(contentStream, state, currentY)
+                    }
+                    
+                    document.save(outputPath.toFile())
+                    true
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                false
+            }
+        }
+
+        /**
+         * Función de conveniencia que genera el PDF y lo abre automáticamente
+         * @param state Estado del formulario con todos los datos
+         * @param fileName Nombre del archivo a generar
+         * @return Ruta del archivo generado o null si hubo error
+         */
+        fun generateAndOpenPDF(state: SessionFormState, fileName: String = "ficha_paciente.pdf"): Path? {
+            val downloadsDir = Paths.get(System.getProperty("user.home"), "Downloads")
+            val outputPath = downloadsDir.resolve(fileName)
+            
+            return if (generateFilledFormPDF(state, outputPath)) {
+                // Abrir el PDF automáticamente
+                if (Desktop.isDesktopSupported()) {
+                    Desktop.getDesktop().open(outputPath.toFile())
+                }
+                outputPath
+            } else {
+                null
+            }
+        }
+
+        /**
+         * Función para generar PDF con nombre personalizado basado en el paciente
+         * @param state Estado del formulario con todos los datos
+         * @return Ruta del archivo generado o null si hubo error
+         */
+        fun generatePatientPDF(state: SessionFormState): Path? {
+            val patientName = state.patient?.displayName?.replace(" ", "_")?.lowercase() ?: "paciente"
+            val timestamp = Clock.System.now().toString()
+                .replace(":", "-").replace(".", "-")
+            val fileName = "ficha_${patientName}_${timestamp}.pdf"
+            
+            return generateAndOpenPDF(state, fileName)
+        }
 
         fun generatePDF(state: SessionFormState, outputPath: Path): Boolean {
             return try {
@@ -97,19 +190,23 @@ class PDFGenerator {
         private fun drawHeader(contentStream: PDPageContentStream, currentY: Float): Float {
             var y = currentY
             
-            // Título principal
+            // Título principal - Centrado como en el original
             contentStream.setFont(FONT_TIMES_BOLD, FONT_SIZE_HEADER)
+            val titleText = "Elaborado por Ps. Manuel Antonio Benavente Arauco"
+            val titleWidth = FONT_TIMES_BOLD.getStringWidth(titleText) * FONT_SIZE_HEADER / 1000f
             contentStream.beginText()
-            contentStream.newLineAtOffset(PAGE_MARGIN, y)
-            contentStream.showText("Elaborado por Ps. Manuel Antonio Benavente Arauco")
+            contentStream.newLineAtOffset((PAGE_SIZE.width - titleWidth) / 2, y)
+            contentStream.showText(titleText)
             contentStream.endText()
-            y -= LINE_HEIGHT * 1.5f
+            y -= LINE_HEIGHT * 2f
             
-            // Subtítulo
+            // Subtítulo - Centrado como en el original
             contentStream.setFont(FONT_BOLD, FONT_SIZE_NORMAL)
+            val subtitleText = "NOTAS PSICOTERAPEUTICAS Y DE EVALUACIONES"
+            val subtitleWidth = FONT_BOLD.getStringWidth(subtitleText) * FONT_SIZE_NORMAL / 1000f
             contentStream.beginText()
-            contentStream.newLineAtOffset(PAGE_MARGIN, y)
-            contentStream.showText("NOTAS PSICOTERAPEUTICAS Y DE EVALUACIONES")
+            contentStream.newLineAtOffset((PAGE_SIZE.width - subtitleWidth) / 2, y)
+            contentStream.showText(subtitleText)
             contentStream.endText()
             y -= LINE_HEIGHT * 2f
             
@@ -120,30 +217,40 @@ class PDFGenerator {
             var y = currentY
             
             // Título de sección
-            y = drawSectionTitle(contentStream, "IDENTIFICACION DEL PACIENTE", y)
+            y = drawSectionTitle(contentStream, "IDENTIFICACIÓN DEL PACIENTE", y)
             
             val patient = state.patient
             val session = state.session
             
-            // Primera fila: Apellidos y Nombres + Fecha de Primera Atención
-            contentStream.setFont(FONT_NORMAL, FONT_SIZE_SMALL)
-            y = drawTwoColumnField(contentStream, "Apellidos y Nombres:", patient?.displayName.orEmpty(), 
-                                  "Fecha de Primea Atención:", session?.firstAttentionDate?.toString().orEmpty(), y)
+            // Validar y mostrar datos reales con placeholders
+            val patientName = patient?.displayName?.takeIf { it.isNotBlank() } ?: "[Sin nombre]"
+            val firstAttentionDate = session?.firstAttentionDate?.toString() ?: "[Sin fecha]"
             
-            // Segunda fila: Fecha de Nacimiento + Edad + Género
-            val ageText = patient?.birthDate?.let { "${calculateAge(it)} años" } ?: ""
-            y = drawThreeColumnField(contentStream, "Fecha de Nacimiento:", patient?.birthDate?.toString().orEmpty(),
-                                   "Edad:", ageText, "Genero:", patient?.gender.orEmpty(), y)
+            y = drawTwoColumnField(contentStream, "Apellidos y Nombres:", patientName, 
+                                  "Fecha de Primera Atención:", firstAttentionDate, y)
             
-            // Tercera fila: Dirección + DNI + Celular
-            y = drawThreeColumnField(contentStream, "Dirección actual:", patient?.address.orEmpty(),
-                                   "N° DNI:", patient?.dni.orEmpty(), "N° Celular:", patient?.phone.orEmpty(), y)
+            // Calcular edad automáticamente si hay fecha de nacimiento
+            val ageText = patient?.birthDate?.let { "${calculateAge(it)} años" } ?: "[Sin edad]"
+            val birthDateText = patient?.birthDate?.toString() ?: "[Sin fecha]"
+            val genderText = patient?.gender?.takeIf { it.isNotBlank() } ?: "[Sin género]"
             
-            // Campos de texto grande
-            y = drawMultilineField(contentStream, "Motivo de consulta principal:", 
-                                  session?.motivoPrincipal.orEmpty(), y, 3)
-            y = drawMultilineField(contentStream, "Otros Motivos a tratar:", 
-                                  session?.otrosMotivos.orEmpty(), y, 3)
+            y = drawThreeColumnField(contentStream, "Fecha de Nacimiento:", birthDateText,
+                                   "Edad:", ageText, "Género:", genderText, y)
+            
+            // Mostrar datos de contacto con validación
+            val addressText = patient?.address?.takeIf { it.isNotBlank() } ?: "[Sin dirección]"
+            val dniText = patient?.dni?.takeIf { it.isNotBlank() } ?: "[Sin DNI]"
+            val phoneText = patient?.phone?.takeIf { it.isNotBlank() } ?: "[Sin teléfono]"
+            
+            y = drawThreeColumnField(contentStream, "Dirección actual:", addressText,
+                                   "N° DNI:", dniText, "N° Celular:", phoneText, y)
+            
+            // Motivos de consulta
+            val motivoPrincipal = session?.motivoPrincipal?.takeIf { it.isNotBlank() } ?: "[Sin motivo principal]"
+            val otrosMotivos = session?.otrosMotivos?.takeIf { it.isNotBlank() } ?: "[Sin otros motivos]"
+            
+            y = drawMultilineField(contentStream, "Motivo de consulta principal:", motivoPrincipal, y, 3)
+            y = drawMultilineField(contentStream, "Otros motivos a tratar:", otrosMotivos, y, 3)
             
             return y - SECTION_MARGIN
         }
@@ -160,7 +267,7 @@ class PDFGenerator {
         private fun drawProblemChainSection(contentStream: PDPageContentStream, state: SessionFormState, currentY: Float): Float {
             var y = currentY
             
-            y = drawSectionTitle(contentStream, "ANALISIS EN CADENA DE LOS PROBLEMAS PRINCIPALES", y)
+            y = drawSectionTitle(contentStream, "ANÁLISIS EN CADENA DE LOS PROBLEMAS PRINCIPALES", y)
             
             // Dibujar tabla
             val headers = listOf("Vulnerabilidades", "Evento desencadenante", "Eslabones", 
@@ -193,18 +300,18 @@ class PDFGenerator {
         private fun drawPsychometricsSection(contentStream: PDPageContentStream, state: SessionFormState, currentY: Float): Float {
             var y = currentY
             
-            y = drawSectionTitle(contentStream, "DATOS PSICOMETRICOS ( DE CORRESPONDER)", y)
+            y = drawSectionTitle(contentStream, "DATOS PSICOMÉTRICOS (DE CORRESPONDER)", y)
             
             val data = state.psychometrics
             if (data != null) {
-                y = drawTwoColumnField(contentStream, "Cociente Intelectual:", data.coeficienteValor.orEmpty(),
+                y = drawTwoColumnField(contentStream, "Cociente intelectual:", data.coeficienteValor.orEmpty(),
                                       "Dato cuantitativo:", data.coeficienteClasificacion.orEmpty(), y)
                 y = drawMultilineField(contentStream, "Temperamento:", data.temperamento.orEmpty(), y, 2)
                 y = drawMultilineField(contentStream, "Personalidad y rasgos importantes:", data.personalidad.orEmpty(), y, 2)
                 y = drawMultilineField(contentStream, "Atención y concentración:", data.atencion.orEmpty(), y, 2)
                 y = drawMultilineField(contentStream, "Problemas de conducta:", data.problemasConducta.orEmpty(), y, 2)
-                y = drawMultilineField(contentStream, "Dinámica Familiar:", data.dinamicaFamiliar.orEmpty(), y, 2)
-                y = drawMultilineField(contentStream, "Otros de Interés:", data.otrosInteres.orEmpty(), y, 2)
+                y = drawMultilineField(contentStream, "Dinámica familiar:", data.dinamicaFamiliar.orEmpty(), y, 2)
+                y = drawMultilineField(contentStream, "Otros de interés:", data.otrosInteres.orEmpty(), y, 2)
             }
             
             return y - SECTION_MARGIN
@@ -213,14 +320,14 @@ class PDFGenerator {
         private fun drawDysregulationSection(contentStream: PDPageContentStream, state: SessionFormState, currentY: Float): Float {
             var y = currentY
             
-            y = drawSectionTitle(contentStream, "AREAS DE DESREGULACION", y)
+            y = drawSectionTitle(contentStream, "ÁREAS DE DESREGULACIÓN", y)
             
             val data = state.dysregulation
             if (data != null) {
                 y = drawMultilineField(contentStream, "Emocional:", data.emocional.orEmpty(), y, 2)
                 y = drawMultilineField(contentStream, "Conductual:", data.conductual.orEmpty(), y, 2)
                 y = drawMultilineField(contentStream, "Interpersonal:", data.interpersonal.orEmpty(), y, 2)
-                y = drawMultilineField(contentStream, "Del Self- Valores:", data.selfValores.orEmpty(), y, 2)
+                y = drawMultilineField(contentStream, "Del self - valores:", data.selfValores.orEmpty(), y, 2)
                 y = drawMultilineField(contentStream, "Cognitiva:", data.cognitiva.orEmpty(), y, 2)
                 y = drawMultilineField(contentStream, "Resumen:", data.resumen.orEmpty(), y, 2)
                 
@@ -243,11 +350,11 @@ class PDFGenerator {
             
             val data = state.biosocial
             if (data != null) {
-                y = drawMultilineField(contentStream, "Vulnerabilidad Emocional:", data.vulnerabilidadEmocional.orEmpty(), y, 2)
+                y = drawMultilineField(contentStream, "Vulnerabilidad emocional:", data.vulnerabilidadEmocional.orEmpty(), y, 2)
                 y = drawMultilineField(contentStream, "Sensibilidad:", data.sensibilidad.orEmpty(), y, 2)
                 y = drawMultilineField(contentStream, "Intensidad:", data.intensidad.orEmpty(), y, 2)
                 y = drawMultilineField(contentStream, "Lento retorno a la calma:", data.lentoRetornoCalma.orEmpty(), y, 2)
-                y = drawMultilineField(contentStream, "Invalidación Ambiental:", data.invalidacionAmbiental.orEmpty(), y, 2)
+                y = drawMultilineField(contentStream, "Invalidación ambiental:", data.invalidacionAmbiental.orEmpty(), y, 2)
                 y = drawMultilineField(contentStream, "Criticar emociones:", data.criticarEmociones.orEmpty(), y, 2)
                 y = drawMultilineField(contentStream, "Resumen:", data.otros.orEmpty(), y, 2)
             }
@@ -281,11 +388,11 @@ class PDFGenerator {
         private fun drawProblemAnalysisSection(contentStream: PDPageContentStream, state: SessionFormState, currentY: Float): Float {
             var y = currentY
             
-            y = drawSectionTitle(contentStream, "EVOLUCION DE LOS OBJETIVOS", y)
+            y = drawSectionTitle(contentStream, "EVOLUCIÓN DE LOS OBJETIVOS", y)
             
             state.problemAnalyses.sortedBy { it.problemNumber }.forEach { analysis ->
-                y = drawSubsectionTitle(contentStream, "Comportamiento Problema ${analysis.problemNumber} (DFI)", y)
-                y = drawMultilineField(contentStream, "Análisis de la Solución", analysis.analisisSolucion.orEmpty(), y, 2)
+                y = drawSubsectionTitle(contentStream, "Comportamiento problema ${analysis.problemNumber} (DFI)", y)
+                y = drawMultilineField(contentStream, "Análisis de la solución", analysis.analisisSolucion.orEmpty(), y, 2)
                 y = drawMultilineField(contentStream, "Vulnerabilidad:", analysis.vulnerabilidad.orEmpty(), y, 2)
                 y = drawMultilineField(contentStream, "Evento precipitante externo:", analysis.eventoExterno.orEmpty(), y, 2)
                 y = drawMultilineField(contentStream, "Pensamientos:", analysis.pensamientos.orEmpty(), y, 2)
@@ -294,7 +401,7 @@ class PDFGenerator {
                 y = drawMultilineField(contentStream, "Emociones:", analysis.emociones.orEmpty(), y, 2)
                 y = drawMultilineField(contentStream, "Consecuencias inmediatas reforzantes:", analysis.consecuenciasInmediatas.orEmpty(), y, 2)
                 y = drawMultilineField(contentStream, "Consecuencias demoradas:", analysis.consecuenciasDemoradas.orEmpty(), y, 2)
-                y = drawMultilineField(contentStream, "Resuma el Plan de Crisis:", analysis.planCrisis.orEmpty(), y, 2)
+                y = drawMultilineField(contentStream, "Resuma el plan de crisis:", analysis.planCrisis.orEmpty(), y, 2)
             }
             
             return y - SECTION_MARGIN
@@ -303,12 +410,12 @@ class PDFGenerator {
         private fun drawEvolutionNotesSection(contentStream: PDPageContentStream, state: SessionFormState, currentY: Float): Float {
             var y = currentY
             
-            y = drawSectionTitle(contentStream, "APUNTES DE EVOLUCION PSICOTERAPEUTICA", y)
+            y = drawSectionTitle(contentStream, "APUNTES DE EVOLUCIÓN PSICOTERAPEUTICA", y)
             
             state.evolutionNotes.forEach { note ->
                 y = drawSubsectionTitle(contentStream, "Sesión ${note.titulo}", y)
                 y = drawTwoColumnField(contentStream, "Fecha:", note.notaFecha.orEmpty(),
-                                      "Comportamiento problema Trabajado:", note.comportamientoTrabajado.orEmpty(), y)
+                                      "Comportamiento problema trabajado:", note.comportamientoTrabajado.orEmpty(), y)
                 y = drawMultilineField(contentStream, "Apuntes:", note.apuntes.orEmpty(), y, 3)
                 y = drawMultilineField(contentStream, "Tareas:", note.tareas.orEmpty(), y, 3)
             }
@@ -421,8 +528,15 @@ class PDFGenerator {
                 y -= LINE_HEIGHT
             }
             
-            if (value.isNotEmpty()) {
-                val words = value.split(" ")
+            // Manejar valores vacíos o nulos
+            val displayValue = if (value.isNullOrBlank()) {
+                "[No especificado]"
+            } else {
+                value
+            }
+            
+            if (displayValue.isNotEmpty()) {
+                val words = displayValue.split(" ")
                 var currentLine = ""
                 var lineCount = 0
                 
@@ -456,7 +570,8 @@ class PDFGenerator {
 
         private fun drawTableHeader(contentStream: PDPageContentStream, headers: List<String>, currentY: Float): Float {
             var y = currentY
-            val columnWidths = listOf(0.35f, 1f, 1f, 1f, 1f)
+            // Ajustar anchos de columnas para que coincidan con el original
+            val columnWidths = listOf(0.3f, 1.2f, 1f, 1.5f, 1.2f)
             var currentX = PAGE_MARGIN
             
             // Dibujar bordes de la tabla
@@ -464,7 +579,7 @@ class PDFGenerator {
             
             // Línea superior
             contentStream.moveTo(PAGE_MARGIN, y)
-            contentStream.lineTo(PAGE_MARGIN + columnWidths.sum() * 80f, y)
+            contentStream.lineTo(PAGE_MARGIN + columnWidths.sum() * 70f, y)
             contentStream.stroke()
             
             // Encabezados
@@ -477,15 +592,15 @@ class PDFGenerator {
                 
                 // Líneas verticales
                 contentStream.moveTo(currentX, y)
-                contentStream.lineTo(currentX, y - 100f)
+                contentStream.lineTo(currentX, y - 120f)
                 contentStream.stroke()
                 
-                currentX += columnWidths[index] * 80f
+                currentX += columnWidths[index] * 70f
             }
             
             // Última línea vertical
             contentStream.moveTo(currentX, y)
-            contentStream.lineTo(currentX, y - 100f)
+            contentStream.lineTo(currentX, y - 120f)
             contentStream.stroke()
             
             return y - 15f
@@ -493,7 +608,8 @@ class PDFGenerator {
 
         private fun drawTableRow(contentStream: PDPageContentStream, values: List<String>, currentY: Float, label: String): Float {
             var y = currentY
-            val columnWidths = listOf(0.35f, 1f, 1f, 1f, 1f)
+            // Usar los mismos anchos de columna que el header
+            val columnWidths = listOf(0.3f, 1.2f, 1f, 1.5f, 1.2f)
             var currentX = PAGE_MARGIN
             
             // Etiqueta de la fila
@@ -505,23 +621,25 @@ class PDFGenerator {
             
             // Contenido de las celdas
             contentStream.setFont(FONT_NORMAL, FONT_SIZE_SMALL)
-            currentX += columnWidths[0] * 80f
+            currentX += columnWidths[0] * 70f
             
             values.forEachIndexed { index, value ->
-                val truncatedValue = value.take(30)
-                contentStream.beginText()
-                contentStream.newLineAtOffset(currentX + 5f, y - 5f)
-                contentStream.showText(truncatedValue)
-                contentStream.endText()
-                currentX += columnWidths[index + 1] * 80f
+                if (index < values.size) { // Verificación de límites
+                    val truncatedValue = value.take(30)
+                    contentStream.beginText()
+                    contentStream.newLineAtOffset(currentX + 5f, y - 5f)
+                    contentStream.showText(truncatedValue)
+                    contentStream.endText()
+                    currentX += columnWidths.getOrNull(index + 1) ?: 1f * 70f
+                }
             }
             
             // Línea inferior de la fila
-            contentStream.moveTo(PAGE_MARGIN, y - 20f)
-            contentStream.lineTo(PAGE_MARGIN + columnWidths.sum() * 80f, y - 20f)
+            contentStream.moveTo(PAGE_MARGIN, y - 25f)
+            contentStream.lineTo(PAGE_MARGIN + columnWidths.sum() * 70f, y - 25f)
             contentStream.stroke()
             
-            return y - 25f
+            return y - 30f
         }
 
         private fun checkPageBreak(contentStream: PDPageContentStream, currentY: Float, requiredSpace: Float): Float {
