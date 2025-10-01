@@ -409,17 +409,21 @@ class PDFGenerator {
 
         private fun drawEvolutionNotesSection(contentStream: PDPageContentStream, state: SessionFormState, currentY: Float): Float {
             var y = currentY
-            
+
             y = drawSectionTitle(contentStream, "APUNTES DE EVOLUCIÓN PSICOTERAPEUTICA", y)
-            
+
             state.evolutionNotes.forEach { note ->
                 y = drawSubsectionTitle(contentStream, "Sesión ${note.titulo}", y)
                 y = drawTwoColumnField(contentStream, "Fecha:", note.notaFecha.orEmpty(),
                                       "Comportamiento problema trabajado:", note.comportamientoTrabajado.orEmpty(), y)
                 y = drawMultilineField(contentStream, "Apuntes:", note.apuntes.orEmpty(), y, 3)
-                y = drawMultilineField(contentStream, "Tareas:", note.tareas.orEmpty(), y, 3)
             }
-            
+
+            buildTasksText(state)?.let { tasksSummary ->
+                y = drawSubsectionTitle(contentStream, "Tareas de la sesión", y)
+                y = drawMultilineField(contentStream, "", tasksSummary, y, 4)
+            }
+
             return y
         }
 
@@ -441,6 +445,53 @@ class PDFGenerator {
             contentStream.showText(title)
             contentStream.endText()
             return currentY - LINE_HEIGHT * 1.2f
+        }
+
+        private fun buildTasksText(state: SessionFormState): String? {
+            val sections = mutableListOf<String>()
+
+            var description = state.tasks?.descripcion?.trim().orEmpty()
+            if (description.isNotEmpty()) {
+                state.attachments.forEach { attachment ->
+                    val token = "[${attachment.displayName}]"
+                    if (description.contains(token)) {
+                        description = description.replace(token, attachment.displayName)
+                    }
+                }
+                val cleaned = removeAttachmentNames(description, state.attachments)
+                if (cleaned.isNotBlank()) {
+                    sections += cleaned
+                }
+            }
+
+            if (state.attachments.isNotEmpty()) {
+                val attachmentsList = state.attachments.joinToString(separator = "\n") { "- ${it.displayName}" }
+                if (attachmentsList.isNotEmpty()) {
+                    sections += "Archivos adjuntos:\n$attachmentsList"
+                }
+            }
+
+            val noteTasks = state.evolutionNotes.mapNotNull { note ->
+                note.tareas?.trim()?.takeIf { it.isNotEmpty() }?.let { tareas ->
+                    val label = note.titulo.ifBlank { "Sesión" }
+                    "- $label: $tareas"
+                }
+            }
+            if (noteTasks.isNotEmpty()) {
+                sections += "Seguimiento por sesión:\n" + noteTasks.joinToString("\n")
+            }
+
+            val text = sections.joinToString(separator = "\n\n").trim()
+            return text.ifEmpty { null }
+        }
+
+        private fun removeAttachmentNames(text: String, attachments: List<com.clinica.domain.model.Attachment>): String {
+            var result = text
+            attachments.forEach { attachment ->
+                val pattern = Regex("\\s*" + Regex.escape(attachment.displayName) + "\\s*")
+                result = result.replace(pattern, " ")
+            }
+            return result.replace(Regex("\\s+"), " ").trim()
         }
 
         private fun drawTwoColumnField(contentStream: PDPageContentStream, label1: String, value1: String, 
@@ -532,7 +583,8 @@ class PDFGenerator {
             val displayValue = if (value.isNullOrBlank()) {
                 "[No especificado]"
             } else {
-                value
+                // Reemplazar caracteres de control no soportados por el font
+                value.replace("\n", " ").replace("\r", " ").replace("\t", " ")
             }
             
             if (displayValue.isNotEmpty()) {

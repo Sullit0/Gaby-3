@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Print
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -63,24 +62,26 @@ fun main() = application {
             colorScheme = if (isDarkTheme) {
                 // Modo oscuro profesional médico
                 androidx.compose.material3.darkColorScheme(
-                    primary = androidx.compose.ui.graphics.Color(0xFF64B5F6),      // Azul suave pero visible
+                    primary = androidx.compose.ui.graphics.Color(0xFF90CAF9),      // Azul más brillante
                     primaryContainer = androidx.compose.ui.graphics.Color(0xFF1E3A5F), // Azul oscuro para contenedores
-                    secondary = androidx.compose.ui.graphics.Color(0xFF4FC3F7),     // Cyan claro
+                    secondary = androidx.compose.ui.graphics.Color(0xFF80DEEA),     // Cyan más brillante
                     secondaryContainer = androidx.compose.ui.graphics.Color(0xFF1E4B5F), // Cyan oscuro
-                    tertiary = androidx.compose.ui.graphics.Color(0xFFBA68C8),      // Púrpura suave
+                    tertiary = androidx.compose.ui.graphics.Color(0xFFCE93D8),      // Púrpura más brillante
                     tertiaryContainer = androidx.compose.ui.graphics.Color(0xFF4A2C4A), // Púrpura oscuro
-                    surface = androidx.compose.ui.graphics.Color(0xFF1A1A1A),       // Fondo oscuro pero no puro negro
+                    surface = androidx.compose.ui.graphics.Color(0xFF1E1E1E),       // Fondo un poco más claro
                     surfaceVariant = androidx.compose.ui.graphics.Color(0xFF2D2D30), // Variantes de superficie
-                    background = androidx.compose.ui.graphics.Color(0xFF0F0F0F),     // Fondo principal
+                    background = androidx.compose.ui.graphics.Color(0xFF121212),     // Fondo principal
                     onPrimary = androidx.compose.ui.graphics.Color(0xFF000000),      // Texto en primario
                     onSecondary = androidx.compose.ui.graphics.Color(0xFF000000),    // Texto en secundario
                     onTertiary = androidx.compose.ui.graphics.Color(0xFF000000),     // Texto en terciario
-                    onSurface = androidx.compose.ui.graphics.Color(0xFFF5F5F5),     // Texto principal blanco suave
-                    onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFFD4D4D4), // Texto en variantes
-                    outline = androidx.compose.ui.graphics.Color(0xFF808080),        // Bordes
-                    outlineVariant = androidx.compose.ui.graphics.Color(0xFF606060),  // Bordes variantes
+                    onSurface = androidx.compose.ui.graphics.Color(0xFFFFFFFF),     // Texto principal blanco puro
+                    onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFFE0E0E0), // Texto en variantes más brillante
+                    outline = androidx.compose.ui.graphics.Color(0xFF9E9E9E),        // Bordes más visibles
+                    outlineVariant = androidx.compose.ui.graphics.Color(0xFF757575),  // Bordes variantes
                     error = androidx.compose.ui.graphics.Color(0xFFCF6679),          // Rojo error suave
-                    onError = androidx.compose.ui.graphics.Color(0xFF000000)        // Texto en error
+                    onError = androidx.compose.ui.graphics.Color(0xFF000000),        // Texto en error
+                    inverseSurface = androidx.compose.ui.graphics.Color(0xFFE0E0E0),  // Superficie inversa
+                    inverseOnSurface = androidx.compose.ui.graphics.Color(0xFF121212)   // Texto en superficie inversa
                 )
             } else {
                 // Modo claro mejorado
@@ -120,10 +121,6 @@ fun main() = application {
                     },
                     onToggleView = {
                         showPatientsList = !showPatientsList
-                    },
-                    onPrintPDF = {
-                        // TODO: Implementar generación de PDF
-                        // Aquí se generará el PDF con los datos actuales del formulario
                     }
                 )
             }
@@ -140,8 +137,7 @@ fun PsychNotesScreen(
     showPatientsList: Boolean = false,
     onThemeToggle: () -> Unit = {},
     onToggleView: () -> Unit = {},
-    onPrintPDF: (() -> Unit)? = null
-) {
+   ) {
     var selectedPatientId by remember { mutableStateOf<String?>(null) }
 
     Column(
@@ -156,20 +152,6 @@ fun PsychNotesScreen(
                 )
             },
             actions = {
-                // Botón imprimir (solo visible en vista de formulario)
-                if (!showPatientsList) {
-                    IconButton(
-                        onClick = { onPrintPDF?.invoke() },
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Print,
-                            contentDescription = "Imprimir ficha",
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
                 IconButton(
                     onClick = onToggleView,
                     modifier = Modifier.padding(end = 8.dp)
@@ -231,25 +213,27 @@ fun PreviewPsychNotes() {
         colorScheme = if (isDarkTheme) {
             // Modo oscuro profesional médico
             androidx.compose.material3.darkColorScheme(
-                primary = androidx.compose.ui.graphics.Color(0xFF64B5F6),      // Azul suave pero visible
-                primaryContainer = androidx.compose.ui.graphics.Color(0xFF1E3A5F), // Azul oscuro para contenedores
-                secondary = androidx.compose.ui.graphics.Color(0xFF4FC3F7),     // Cyan claro
-                secondaryContainer = androidx.compose.ui.graphics.Color(0xFF1E4B5F), // Cyan oscuro
-                tertiary = androidx.compose.ui.graphics.Color(0xFFBA68C8),      // Púrpura suave
-                tertiaryContainer = androidx.compose.ui.graphics.Color(0xFF4A2C4A), // Púrpura oscuro
-                surface = androidx.compose.ui.graphics.Color(0xFF1A1A1A),       // Fondo oscuro pero no puro negro
-                surfaceVariant = androidx.compose.ui.graphics.Color(0xFF2D2D30), // Variantes de superficie
-                background = androidx.compose.ui.graphics.Color(0xFF0F0F0F),     // Fondo principal
-                onPrimary = androidx.compose.ui.graphics.Color(0xFF000000),      // Texto en primario
-                onSecondary = androidx.compose.ui.graphics.Color(0xFF000000),    // Texto en secundario
-                onTertiary = androidx.compose.ui.graphics.Color(0xFF000000),     // Texto en terciario
-                onSurface = androidx.compose.ui.graphics.Color(0xFFF5F5F5),     // Texto principal blanco suave
-                onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFFD4D4D4), // Texto en variantes
-                outline = androidx.compose.ui.graphics.Color(0xFF808080),        // Bordes
-                outlineVariant = androidx.compose.ui.graphics.Color(0xFF606060),  // Bordes variantes
-                error = androidx.compose.ui.graphics.Color(0xFFCF6679),          // Rojo error suave
-                onError = androidx.compose.ui.graphics.Color(0xFF000000)        // Texto en error
-            )
+                    primary = androidx.compose.ui.graphics.Color(0xFF90CAF9),      // Azul más brillante
+                    primaryContainer = androidx.compose.ui.graphics.Color(0xFF1E3A5F), // Azul oscuro para contenedores
+                    secondary = androidx.compose.ui.graphics.Color(0xFF80DEEA),     // Cyan más brillante
+                    secondaryContainer = androidx.compose.ui.graphics.Color(0xFF1E4B5F), // Cyan oscuro
+                    tertiary = androidx.compose.ui.graphics.Color(0xFFCE93D8),      // Púrpura más brillante
+                    tertiaryContainer = androidx.compose.ui.graphics.Color(0xFF4A2C4A), // Púrpura oscuro
+                    surface = androidx.compose.ui.graphics.Color(0xFF1E1E1E),       // Fondo un poco más claro
+                    surfaceVariant = androidx.compose.ui.graphics.Color(0xFF2D2D30), // Variantes de superficie
+                    background = androidx.compose.ui.graphics.Color(0xFF121212),     // Fondo principal
+                    onPrimary = androidx.compose.ui.graphics.Color(0xFF000000),      // Texto en primario
+                    onSecondary = androidx.compose.ui.graphics.Color(0xFF000000),    // Texto en secundario
+                    onTertiary = androidx.compose.ui.graphics.Color(0xFF000000),     // Texto en terciario
+                    onSurface = androidx.compose.ui.graphics.Color(0xFFFFFFFF),     // Texto principal blanco puro
+                    onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFFE0E0E0), // Texto en variantes más brillante
+                    outline = androidx.compose.ui.graphics.Color(0xFF9E9E9E),        // Bordes más visibles
+                    outlineVariant = androidx.compose.ui.graphics.Color(0xFF757575),  // Bordes variantes
+                    error = androidx.compose.ui.graphics.Color(0xFFCF6679),          // Rojo error suave
+                    onError = androidx.compose.ui.graphics.Color(0xFF000000),        // Texto en error
+                    inverseSurface = androidx.compose.ui.graphics.Color(0xFFE0E0E0),  // Superficie inversa
+                    inverseOnSurface = androidx.compose.ui.graphics.Color(0xFF121212)   // Texto en superficie inversa
+                )
         } else {
             // Modo claro mejorado
             androidx.compose.material3.lightColorScheme(
@@ -282,8 +266,7 @@ fun PreviewPsychNotes() {
                 showPatientsList = showPatientsList,
                 onThemeToggle = { isDarkTheme = !isDarkTheme },
                 onToggleView = { showPatientsList = !showPatientsList },
-                onPrintPDF = null
-            )
+              )
         }
     }
 }

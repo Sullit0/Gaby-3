@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -65,6 +66,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -116,9 +118,10 @@ import java.awt.dnd.DropTargetAdapter
 import java.awt.dnd.DropTargetDragEvent
 import java.awt.dnd.DropTargetDropEvent
 import java.awt.dnd.DropTargetEvent
-import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
+import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.DEFAULT_BUFFER_SIZE
@@ -165,7 +168,7 @@ fun SessionFormScreen(
     DesktopDropTargetHandler(
         composeWindow = composeWindow,
         boundsRef = dropBoundsRef,
-        onHoverChange = { isDragHovering = it },
+        onHoverChange = { isDragging: Boolean -> isDragHovering = isDragging },
         onFilesDropped = { files ->
             val patientId = state.patient?.id
             val sessionId = state.session?.id
@@ -317,17 +320,22 @@ fun SessionFormScreen(
                 var isPrinting by remember { mutableStateOf(false) }
                 var isGeneratingPDF by remember { mutableStateOf(false) }
 
-                // Botón de guardar
+                // Botón de Guardar (solo persiste en DB)
                 Button(
                     onClick = {
                         coroutineScope.launch {
                             isSaving = true
                             saveSuccess = false
+                            // Guardar sesión en la base de datos
                             viewModel.saveSession()
                             // Pequeña espera para asegurar que se guarde
                             kotlinx.coroutines.delay(500)
                             isSaving = false
                             saveSuccess = true
+
+                            // Mostrar éxito brevemente y luego resetear
+                            kotlinx.coroutines.delay(1000)
+                            saveSuccess = false
                         }
                     },
                     modifier = Modifier.weight(1f),
@@ -345,32 +353,44 @@ fun SessionFormScreen(
                     }
                 }
 
-                // Botón de impresión (icono)
-                IconButton(
+                // Botón de Imprimir (solo imprime, no guarda en DB)
+                Button(
                     onClick = {
                         coroutineScope.launch {
                             isPrinting = true
-                            // Usar la plantilla que el usuario adjuntó
-                            val templatePath = Paths.get(System.getProperty("user.home"), "ficha de consulta (1).docx")
-                            val result = WordDocumentGenerator.fillTemplateAndPrint(state, templatePath)
-                            isPrinting = false
-                            
-                            if (result != null) {
-                                println("Documento enviado a impresión: $result")
-                            } else {
-                                println("Error al generar documento para impresión")
+                            try {
+                                println("Iniciando impresión directa...")
+                                val templatePath = WordDocumentGenerator.ensureBundledTemplate()
+                                if (templatePath != null) {
+                                    println("Generando documento para impresión...")
+                                    val result = WordDocumentGenerator.fillTemplateAndPrintDirect(state, templatePath)
+                                    if (result) {
+                                        println("✅ Documento enviado a impresión correctamente")
+                                    } else {
+                                        println("❌ Falló la impresión del documento")
+                                    }
+                                } else {
+                                    println("❌ No se encontró la plantilla Word")
+                                }
+                            } catch (e: Exception) {
+                                println("❌ Error en impresión: ${e.message}")
+                                e.printStackTrace()
                             }
+                            isPrinting = false
                         }
                     },
+                    modifier = Modifier.weight(1f),
                     enabled = state.patient != null && state.session != null && !isSaving && !isPrinting && !isGeneratingPDF
                 ) {
                     if (isPrinting) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(16.dp),
                             strokeWidth = 2.dp
                         )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Imprimiendo...")
                     } else {
-                        Icon(Icons.Outlined.Print, contentDescription = "Imprimir ficha", modifier = Modifier.size(24.dp))
+                        Text("Imprimir")
                     }
                 }
 
@@ -380,13 +400,19 @@ fun SessionFormScreen(
                         coroutineScope.launch {
                             isGeneratingPDF = true
                             // Ruta de la plantilla (puedes cambiarla a donde tengas tu plantilla .docx)
-                            val templatePath = Paths.get(System.getProperty("user.home"), "ficha de consulta (1).docx")
-                            val result = WordDocumentGenerator.fillTemplateForPatient(state, templatePath)
+                            val templatePath = WordDocumentGenerator.ensureBundledTemplate()
+                            if (templatePath == null) {
+                                println("No se pudo cargar la plantilla Word desde los recursos")
+                            }
+                            val result = templatePath?.let { path ->
+                                WordDocumentGenerator.fillTemplateForPatient(state, path)
+                            }
                             isGeneratingPDF = false
-                            
+
                             if (result != null) {
                                 // Mostrar mensaje de éxito o abrir el archivo
                                 println("Documento Word generado en: $result")
+                                openAttachment(result)
                             } else {
                                 // Mostrar mensaje de error
                                 println("Error al generar documento Word")
@@ -402,13 +428,69 @@ fun SessionFormScreen(
                             strokeWidth = 2.dp
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text("Generar Word")
+                        Text("Generando...")
                     } else {
                         Text("Descargar Word")
                     }
                 }
             }
         }
+    }
+}
+
+// Función para imprimir PDF mostrando el diálogo de impresión del sistema
+private fun printPDFWithDialog(pdfFile: File): Boolean {
+    return try {
+        // Usar Desktop para abrir el diálogo de impresión
+        if (Desktop.isDesktopSupported()) {
+            val desktop = Desktop.getDesktop()
+            if (desktop.isSupported(Desktop.Action.PRINT)) {
+                desktop.print(pdfFile)
+                true
+            } else {
+                // Si no se soporta la acción PRINT, abrir el archivo para que el usuario lo imprima manualmente
+                desktop.open(pdfFile)
+                false
+            }
+        } else {
+            println("Desktop no está soportado en este sistema")
+            // Alternativa: abrir el archivo con el visor de PDF predeterminado
+            openFileWithDefaultApplication(pdfFile)
+            false
+        }
+    } catch (e: Exception) {
+        println("Error al intentar imprimir: ${e.message}")
+        e.printStackTrace()
+        // Alternativa: abrir el archivo con el visor de PDF predeterminado
+        openFileWithDefaultApplication(pdfFile)
+        false
+    }
+}
+
+// Función alternativa para abrir archivos en sistemas que no soportan Desktop
+private fun openFileWithDefaultApplication(file: File) {
+    try {
+        val osName = System.getProperty("os.name").lowercase()
+        when {
+            osName.contains("win") -> {
+                // Windows: usar cmd para abrir el archivo
+                val command = "cmd /c start \"\" \"${file.absolutePath}\""
+                Runtime.getRuntime().exec(command)
+            }
+            osName.contains("mac") -> {
+                // macOS: usar open command
+                val command = "open \"${file.absolutePath}\""
+                Runtime.getRuntime().exec(command)
+            }
+            else -> {
+                // Linux y otros: usar xdg-open
+                val command = "xdg-open \"${file.absolutePath}\""
+                Runtime.getRuntime().exec(command)
+            }
+        }
+    } catch (e: Exception) {
+        println("Error al abrir el archivo: ${e.message}")
+        e.printStackTrace()
     }
 }
 
@@ -440,16 +522,22 @@ private fun SectionCard(
     actions: (@Composable RowScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val borderColor = MaterialTheme.colorScheme.outline
+    val headerColor = MaterialTheme.colorScheme.primaryContainer
+    val headerContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+    val bodyColor = MaterialTheme.colorScheme.surface
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp)
-            .border(1.dp, Color.Black)
+            .border(1.dp, borderColor, RoundedCornerShape(4.dp))
+            .clip(RoundedCornerShape(4.dp))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF424242))
+                .background(headerColor)
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = if (actions == null) Arrangement.Center else Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
@@ -458,7 +546,7 @@ private fun SectionCard(
                 text = title.uppercase(),
                 style = MaterialTheme.typography.titleSmall.copy(
                     fontWeight = FontWeight.SemiBold,
-                    color = Color.White
+                    color = headerContentColor
                 )
             )
             if (actions != null) {
@@ -472,7 +560,7 @@ private fun SectionCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White)
+                .background(bodyColor)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -574,11 +662,14 @@ private fun ProblemChainSection(state: SessionFormState, viewModel: SessionFormV
         "Consecuentes"
     )
 
+    val borderColor = MaterialTheme.colorScheme.outline
+    val rowHighlight = MaterialTheme.colorScheme.surfaceVariant
+
     Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, Color.Black),
+                .border(1.dp, borderColor),
             horizontalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             TableHeaderCell(text = "", modifier = Modifier.weight(0.35f))
@@ -590,13 +681,13 @@ private fun ProblemChainSection(state: SessionFormState, viewModel: SessionFormV
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, Color.Black),
+                    .border(1.dp, borderColor),
                 horizontalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 FormCell(
                     label = "",
                     modifier = Modifier.weight(0.35f),
-                    backgroundColor = Color(0xFFF5F5F5)
+                    backgroundColor = rowHighlight
                 ) {
                     Text(
                         text = entry.label,
@@ -767,8 +858,7 @@ private fun DysregulationSection(state: SessionFormState, viewModel: SessionForm
         )
         FormCell(
             label = "Aplicación de BsL-23 (siempre y cuando se sospeche de TLP)",
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Color.White
+            modifier = Modifier.fillMaxWidth()
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -845,18 +935,21 @@ private fun TreatmentObjectivesSection(state: SessionFormState, viewModel: Sessi
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         stageEntries.forEachIndexed { index, (stage, definitions) ->
             Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                val headerBackground = MaterialTheme.colorScheme.secondaryContainer
+                val headerContent = MaterialTheme.colorScheme.onSecondaryContainer
+                val borderColor = MaterialTheme.colorScheme.outline
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, Color.Black)
-                        .background(Color(0xFF4A4A4A))
+                        .border(1.dp, borderColor)
+                        .background(headerBackground)
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Text(
                         text = stageLabel(stage).uppercase(),
                         style = MaterialTheme.typography.labelLarge.copy(
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = headerContent
                         )
                     )
                 }
@@ -883,18 +976,21 @@ private fun ProblemAnalysisSection(state: SessionFormState, viewModel: SessionFo
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         analyses.forEach { analysis ->
             Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                val headerBackground = MaterialTheme.colorScheme.tertiaryContainer
+                val headerContent = MaterialTheme.colorScheme.onTertiaryContainer
+                val borderColor = MaterialTheme.colorScheme.outline
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, Color.Black)
-                        .background(Color(0xFF4A4A4A))
+                        .border(1.dp, borderColor)
+                        .background(headerBackground)
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Text(
                         text = "Comportamiento problema ${analysis.problemNumber} (DFI)",
                         style = MaterialTheme.typography.labelLarge.copy(
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = headerContent
                         )
                     )
                 }
@@ -1028,7 +1124,7 @@ private fun EvolutionNotesSection(state: SessionFormState, viewModel: SessionFor
                         onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(titulo = value) } },
                         modifier = Modifier.weight(1f),
                         minLines = 1,
-                        labelColor = Color(0xFFD32F2F)
+                        labelColor = MaterialTheme.colorScheme.onSurface
                     )
                     FormTextField(
                         label = "Fecha",
@@ -1049,12 +1145,6 @@ private fun EvolutionNotesSection(state: SessionFormState, viewModel: SessionFor
                     label = "Apuntes",
                     value = note.apuntes.orEmpty(),
                     onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(apuntes = value) } },
-                    minLines = 3
-                )
-                FormTextField(
-                    label = "Tareas",
-                    value = note.tareas.orEmpty(),
-                    onValueChange = { value -> viewModel.updateEvolutionNote(note.id) { it.copy(tareas = value) } },
                     minLines = 3
                 )
                 Row(
@@ -1234,12 +1324,13 @@ private fun FormCell(
     label: String,
     modifier: Modifier = Modifier,
     labelColor: Color = MaterialTheme.colorScheme.onSurface,
-    backgroundColor: Color = Color.White,
+    backgroundColor: Color = MaterialTheme.colorScheme.surface,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val borderColor = MaterialTheme.colorScheme.outline
     Column(
         modifier = modifier
-            .border(1.dp, Color.Black)
+            .border(1.dp, borderColor)
             .background(backgroundColor)
             .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -1270,7 +1361,7 @@ private fun FormTextField(
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
-            textStyle = MaterialTheme.typography.bodyMedium,
+            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             keyboardOptions = keyboardOptions,
             minLines = minLines,
@@ -1317,12 +1408,15 @@ private fun FormReadOnlyField(
 private fun RowScope.TableHeaderCell(
     text: String,
     modifier: Modifier = Modifier,
-    backgroundColor: Color = Color(0xFF4A4A4A)
+    backgroundColor: Color? = null
 ) {
+    val cellBackground = backgroundColor ?: MaterialTheme.colorScheme.primaryContainer
+    val borderColor = MaterialTheme.colorScheme.outline
+    val contentColor = MaterialTheme.colorScheme.onPrimaryContainer
     Box(
         modifier = modifier
-            .border(1.dp, Color.Black)
-            .background(backgroundColor)
+            .border(1.dp, borderColor)
+            .background(cellBackground)
             .padding(horizontal = 8.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -1330,7 +1424,7 @@ private fun RowScope.TableHeaderCell(
             text = text,
             style = MaterialTheme.typography.labelMedium.copy(
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White
+                color = contentColor
             ),
             textAlign = TextAlign.Center
         )

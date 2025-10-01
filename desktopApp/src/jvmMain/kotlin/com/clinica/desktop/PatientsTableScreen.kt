@@ -1,5 +1,6 @@
 package com.clinica.desktop
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -25,6 +27,8 @@ import com.clinica.domain.model.Session
 import com.clinica.domain.model.Attachment
 import kotlinx.datetime.LocalDate
 import java.nio.file.Files
+import java.awt.Desktop
+import java.io.File
 import java.nio.file.Path
 import java.nio.file.Paths
 import kotlinx.coroutines.launch
@@ -39,7 +43,6 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.Instant
 import kotlinx.datetime.periodUntil
-import java.awt.Desktop
 import java.awt.print.PrinterJob
 import java.awt.print.PrinterException
 import java.awt.print.Printable
@@ -48,9 +51,7 @@ import java.awt.print.Paper
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.Font
-import java.awt.Color
 import javax.imageio.ImageIO
-import java.io.File
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.rendering.PDFRenderer
 import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException
@@ -291,6 +292,9 @@ fun PatientsTableScreen(
                             }
                             HorizontalDivider()
                         }
+                    }
+                }
+            }
         }
     }
 }
@@ -393,36 +397,26 @@ private fun PatientTableRow(
                 )
             }
             IconButton(
-                onClick = onDelete,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Eliminar paciente",
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            IconButton(
                 onClick = {
                     scope.launch {
                         try {
-                            // Obtener el estado completo del formulario para este paciente
-                            val formState = viewModel.createSessionStateForPatient(patient.id)
-                            if (formState != null) {
-                                // Generar el PDF y guardarlo en Descargas
-                                val downloadsFolder = getDownloadsFolder()
-                                val fileName = "Ficha_${patient.displayName.replace(" ", "_")}_${java.time.LocalDate.now()}.pdf"
-                                val outputPath = java.nio.file.Paths.get(downloadsFolder, fileName)
-                                
-                                val success = PDFGenerator.generatePDF(formState, outputPath)
+                            // Cargar los datos del paciente para imprimir
+                            viewModel.loadPatientById(patient.id)
+                            val templatePath = WordDocumentGenerator.ensureBundledTemplate()
+                            
+                            if (templatePath != null) {
+                                println("Imprimiendo ficha de paciente: ${patient.displayName}")
+                                val success = WordDocumentGenerator.fillTemplateAndPrintDirect(viewModel.state.value, templatePath)
                                 if (success) {
-                                    // Abrir el diálogo de impresión del sistema
-                                    printPDFWithDialog(outputPath.toFile())
+                                    println("✅ Ficha enviada a impresión correctamente")
+                                } else {
+                                    println("❌ Error al imprimir ficha")
                                 }
+                            } else {
+                                println("❌ No se pudo cargar plantilla o datos del paciente")
                             }
                         } catch (e: Exception) {
-                            // Manejar error de impresión
+                            println("❌ Error al imprimir ficha: ${e.message}")
                             e.printStackTrace()
                         }
                     }
@@ -433,6 +427,17 @@ private fun PatientTableRow(
                     Icons.Default.Print,
                     contentDescription = "Imprimir ficha",
                     tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Eliminar paciente",
+                    tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -453,12 +458,16 @@ private fun PatientDetailsPanel(
     LaunchedEffect(patient.id) {
         scope.launch(Dispatchers.IO) {
             try {
-                // Obtener todas las sesiones del paciente
-                val sessions = viewModel.sessionRepository.getSessionsByPatient(patient.id)
-                // Obtener todos los adjuntos de todas las sesiones
-                val allAttachments = sessions.flatMap { session ->
-                    viewModel.sessionRepository.getAttachmentsBySession(session.id)
+                // Obtener todas las sesiones del paciente filtrando en memoria
+                val patientSessions = viewModel.sessionRepository
+                    .getAllSessions()
+                    .filter { it.patientId == patient.id }
+
+                // Unificar todos los adjuntos asociados a las sesiones del paciente
+                val allAttachments = patientSessions.flatMap { session ->
+                    viewModel.sessionRepository.getAttachments(session.id)
                 }
+
                 attachments = allAttachments
                 isLoadingAttachments = false
             } catch (e: Exception) {
@@ -611,6 +620,7 @@ private fun AttachmentItem(
     patientId: String
 ) {
     var isHovered by remember { mutableStateOf(false) }
+    val readableSize = attachment.sizeBytes?.let { formatFileSize(it) } ?: "Tamaño desconocido"
     
     Row(
         modifier = Modifier
@@ -656,7 +666,7 @@ private fun AttachmentItem(
                     maxLines = 1
                 )
                 Text(
-                    text = "${formatFileSize(attachment.sizeBytes)} • ${attachment.mimeType ?: "Tipo desconocido"}",
+                    text = "$readableSize • ${attachment.mimeType ?: "Tipo desconocido"}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
                 )
@@ -702,54 +712,9 @@ private fun getDownloadsFolder(): String {
     }
 }
 
-// Función para imprimir PDF mostrando el diálogo de impresión del sistema
-private fun printPDFWithDialog(pdfFile: File) {
-    try {
-        // Usar Desktop para abrir el diálogo de impresión
-        if (Desktop.isDesktopSupported()) {
-            val desktop = Desktop.getDesktop()
-            if (desktop.isSupported(Desktop.Action.PRINT)) {
-                desktop.print(pdfFile)
-            } else {
-                // Si no se soporta la acción PRINT, abrir el archivo para que el usuario lo imprima manualmente
-                desktop.open(pdfFile)
-            }
-        } else {
-            println("Desktop no está soportado en este sistema")
-            // Alternativa: abrir el archivo con el visor de PDF predeterminado
-            openFileWithDefaultApplication(pdfFile)
-        }
-    } catch (e: Exception) {
-        println("Error al intentar imprimir: ${e.message}")
-        e.printStackTrace()
-        // Alternativa: abrir el archivo con el visor de PDF predeterminado
-        openFileWithDefaultApplication(pdfFile)
-    }
-}
-
-// Función alternativa para abrir archivos en sistemas que no soportan Desktop
-private fun openFileWithDefaultApplication(file: File) {
-    try {
-        val osName = System.getProperty("os.name").lowercase()
-        when {
-            osName.contains("win") -> {
-                // Windows: usar cmd para abrir el archivo
-                val command = "cmd /c start \"\" \"${file.absolutePath}\""
-                Runtime.getRuntime().exec(command)
-            }
-            osName.contains("mac") -> {
-                // macOS: usar open command
-                val command = arrayOf("open", file.absolutePath)
-                Runtime.getRuntime().exec(command)
-            }
-            else -> {
-                // Linux y otros: usar xdg-open
-                val command = arrayOf("xdg-open", file.absolutePath)
-                Runtime.getRuntime().exec(command)
-            }
-        }
-    } catch (e: Exception) {
-        println("Error al abrir el archivo: ${e.message}")
-        e.printStackTrace()
+// Función para abrir archivos adjuntos (como en FormScreen)
+private fun openAttachment(path: java.nio.file.Path) {
+    if (Desktop.isDesktopSupported()) {
+        Desktop.getDesktop().open(path.toFile())
     }
 }

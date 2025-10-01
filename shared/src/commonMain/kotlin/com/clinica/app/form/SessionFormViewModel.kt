@@ -43,16 +43,31 @@ class SessionFormViewModel(
         scope.launch(Dispatchers.Default) {
             runCatching {
                 val patient = patientRepository.getAllPatients().firstOrNull()
-                if (patient != null) {
-                    ensureSession(patient.id)
-                } else {
-                    currentSessionId = null
-                    _state.value = SessionFormState(isLoading = false)
-                }
+                    ?: createDefaultPatient()
+                ensureSession(patient.id)
             }.onFailure { err ->
                 handleError(err)
             }
         }
+    }
+
+    private suspend fun createDefaultPatient(): Patient {
+        val now = Clock.System.now()
+        val defaultPatient = Patient(
+            id = "default_patient_${now.toEpochMilliseconds()}",
+            displayName = "Ficha de Consulta",
+            firstName = "Nueva",
+            lastName = "Ficha",
+            dni = null,
+            gender = null,
+            birthDate = null,
+            phone = null,
+            address = null,
+            createdAt = now,
+            updatedAt = now
+        )
+        patientRepository.upsert(defaultPatient)
+        return defaultPatient
     }
 
     private suspend fun ensureSession(patientId: String) {
@@ -96,6 +111,16 @@ class SessionFormViewModel(
     fun updatePatientName(name: String) {
         val patient = _state.value.patient ?: return
         updatePatient(patient.copy(displayName = name, updatedAt = Clock.System.now()))
+    }
+
+    fun clearForm() {
+        scope.launch(Dispatchers.Default) {
+            runCatching {
+                loadDefaultPatient()
+            }.onFailure { err ->
+                handleError(err)
+            }
+        }
     }
 
     fun updatePatientField(block: (Patient) -> Patient) {
@@ -179,6 +204,29 @@ class SessionFormViewModel(
             }.onFailure { err ->
                 handleError(err)
             }
+
+            // Después de guardar exitosamente, crear una nueva sesión vacía
+            createNewSession()
+        }
+    }
+
+    private suspend fun createNewSession() {
+        runCatching {
+            val patient = patientRepository.getAllPatients().firstOrNull()
+                ?: createDefaultPatient()
+
+            val newSession = sessionRepository.createSession(patient.id)
+            currentSessionId = newSession.id
+
+            // Cargar el estado de la nueva sesión vacía
+            _state.value = SessionFormState(
+                patient = patient,
+                session = newSession,
+                isLoading = false,
+                error = null
+            )
+        }.onFailure { err ->
+            handleError(err)
         }
     }
 
